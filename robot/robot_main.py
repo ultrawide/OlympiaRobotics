@@ -4,7 +4,12 @@
 #
 #   Expects b"from" from RoboServoController.py ,
 #   Returns 'command' executed and moves servos
+#   
+#   Requires pigpio library
+#   sudo apt-get update
+#   sudo apt-get install pigpio python-pigpio python3-pigpio
 #
+
 from __future__ import division
 import time
 import zmq
