@@ -1,0 +1,7 @@
+
+Requires Python version 3.7
+
+pip3.7 install --user opencv-python
+pip3.7 install --user opencv-contrib-python
+pip3.7 install --user zmq
+pip3.7 install --user pyqt5
