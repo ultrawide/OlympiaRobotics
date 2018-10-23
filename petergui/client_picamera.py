@@ -2,7 +2,7 @@ from picamera import PiCamera
 import zmq
 from time import sleep
 import base64
-import numpy
+import io
 
 context = zmq.Context()
 print("Connecting to server...")
@@ -10,18 +10,17 @@ socket = context.socket(zmq.REQ)
 socket.connect("tcp://207.23.206.18:8000")
 print("\n Connected")
 
-camera = PiCamera(resolution=(400,300))
-
+camera = PiCamera(resolution=(640,480))
 
 while True:
 
 	try:
             camera.start_preview()
-            camera.capture('/home/pi/capstone/OlympiaRobotics/petergui/image.jpg')
+	    stream = io.BytesIO()
+            camera.capture(stream, format='jpeg', use_video_port=True)
+	    stream.seek(0)
             camera.stop_preview()
-            f = open('image.jpg','rb')
-            bytes = bytearray(f.read())
-            image = base64.b64encode(bytes)
+            image = base64.b64encode(stream)
             socket.send(image)
             socket.recv()
 
