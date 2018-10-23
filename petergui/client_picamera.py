@@ -2,6 +2,7 @@ from picamera import PiCamera
 import zmq
 from time import sleep
 import base64
+import numpy
 
 context = zmq.Context()
 print("Connecting to server...")
