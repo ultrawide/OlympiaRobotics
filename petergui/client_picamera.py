@@ -20,7 +20,7 @@ while True:
             camera.capture(stream, format='jpeg', use_video_port=True)
 	    stream.seek(0)
             camera.stop_preview()
-            image = base64.b64encode(stream)
+            image = base64.b64encode(stream.getvalue())
             socket.send(image)
             socket.recv()
 
