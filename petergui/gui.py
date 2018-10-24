@@ -21,7 +21,7 @@ class Thread(QThread):
 		
 	def run(self):
 		connection = self.server_socket.accept()[0].makefile('rb')
-		
+		print("Thread Started")
 		try:
 			self.running = True
 			while self.running:
