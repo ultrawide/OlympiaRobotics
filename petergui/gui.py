@@ -4,102 +4,80 @@ from PyQt5.QtCore import *
 import os
 import sys
 import time
-import zmq
-import base64
-#import cv2
-
-context = zmq.Context()
-socket = context.socket(zmq.REP)  # using rep and req model. We can improve this
-socket2 = context.socket(zmq.REP)
+import socket
+import struct
+from PIL import Image
 
 # This thread reads the image from the robot's camera
 class Thread(QThread):
-	sig1 = pyqtSignal()
-	socket.bind("tcp://207.23.201.138:8000")
-	def __init__(self, parent=None):
-		super(QThread, self).__init__()
-		
-
-	def run(self):
-		self.running = True
-		
-		
-		while self.running:
-			image = socket.recv()
-			socket.send_string('')  # sends back an empty string
-			f = open("image.jpg", 'wb')
-			ba = bytearray(base64.b64decode(image))
-			#print(ba)
-			f.write(ba)
-			f.close()
-			print("received image 1")
-			self.sig1.emit()
-			#time.sleep(1)
-
-class Thread1(QThread):
-	sig2 = pyqtSignal()
-	socket2.bind("tcp://207.23.201.138:8001")
-	def __init__(self, parent=None):
+	sig = pyqtSignal()
+	server_socket = None
+	def __init__(self, address, port, parent=None):
 		super(QThread, self).__init__()
 
+		self.server_socket = socket.socket()
+		self.server_socket.bind(address,port)
+		self.server_socket.listen(0)
+		
 	def run(self):
-		self.running = True
+		connection = server_socket.accept()[0].makefile('rb')
+		
+		try:
+			self.running = True
+			while self.running:
+				image_len = struct_unpack('<L', connection.read(struct.calcsize('<L')))[0]
+				# if the image length is 0 quit the loop and stop the thread
+				if not image_len
+					self.running = False
+					break
+				# construct a stream to hold the image data and read the image
+				image_stream = io.BytesIO()
+				image_stream.write(connection.read(image_len))
+				image_stream.seek(0)
+				image = Image.open(image_stream)
+				self.sig.emit() # emit a signal to tell the gui its time to update the lable image
 
-		while self.running:
-			image = socket2.recv()
-			socket2.send_string('')
-			f = open("image2.jpg", "wb")
-			ba = bytearray(base64.b64decode(image))
-			f.write(ba)
-			f.close()
-			print("received image 2")
-			self.sig2.emit()
+		finally:
+			connection.close()
+			server_socket.close()
+				
 			
 class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
-		self.label = QLabel('', self)
-		self.layout = QGridLayout()
-		self.label2 = QLabel('', self)
-		self.robotlabel1 = QLabel('',self)
-		self.robotlabel2 = QLabel('',self)
-		self.button = QPushButton('STOP/SLOW', self)
-		self.button.clicked.connect(self.handleButton)
-		self.button2 = QPushButton('STOP/SLOW', self)
-		self.button2.clicked.connect(self.handleButton)
-		#horizontalLayout = QHBoxLayout()
-		#horizontalLayout.addWidget( self.label )
+
+		self.video_label_r1 = QLabel('Robot 1 Video Feed Unavailable', self)
+		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
+		self.robot_label_r1 = QLabel("Robot 1",self)
+		self.robot_label_r2 = QLabel("Robot 2",self)
+		self.slow_stop_button_r1 = QPushButton('STOP/SLOW', self)
+		self.slow_stop_button_r1.clicked.connect(self.handleButton)
+		self.slow_stop_button_r2 = QPushButton('STOP/SLOW', self)
+		self.slow_stop_button_r2.clicked.connect(self.handleButton)
+		
 		#SETTING POSITION
 		#horizontal,vertical, size_horizontal, size_vertical
-		self.robotlabel1.setGeometry(10,10,480,30)
-		self.robotlabel2.setGeometry(720,10,480,30)
-		self.label.setGeometry(10,50,640,480)
-		self.label2.setGeometry(720,50,640,480)
-		self.button.setGeometry(10,550,640,100)
-		self.button2.setGeometry(720,550,640,100)
+		self.robot_label_r1.setGeometry(10,10,480,30)
+		self.robot_label_r2.setGeometry(720,10,480,30)
+		self.video_label_r1.setGeometry(10,50,640,480)
+		self.video_label_r2.setGeometry(720,50,640,480)
+		self.slow_stop_button_r1.setGeometry(10,550,640,100)
+		self.slow_stop_button_r2.setGeometry(720,550,640,100)
 		
-
-		self.robotlabel1.setText("Robot 1")
-		self.robotlabel2.setText("Robot 2")
-		#self.layout.addWidget(self.label, 0, 0)
-		self.setLayout(self.layout)
-		self.th = Thread(self)
-		self.th1 = Thread1(self)
-		self.th.start()
-		self.th1.start()
-		self.th.sig1.connect(self.on_change)
-		self.th1.sig2.connect(self.on_change1)
+		self.video_reader_r1 = Thread(self, '207.23.201.138', 8000)  # Colin edit address
+		self.video_reader_r2 = Thread(self, '207.23.201.138', 8001)  # Colin edit address
+		self.video_reader_r1.start()
+		self.video_reader_r2.start()
+		self.video_reader_r1.sig.connect(self.on_change_r1)
+		self.video_reader_r2.sig.connect(self.on_change_r2)
 		self.show()
 
-	def on_change(self):
-		self.my_image = QPixmap('image.jpg')
-		self.label.setPixmap(self.my_image)
-		#self.label2.setPixmap(self.my_image)
+	def on_change_r1(self):
+		self.video_label_r1.setPixmap(QPixmap('image_r1.jpg'))
 
-	def on_change1(self):
-		self.my_image2 = QPixmap('image2.jpg')
-		self.label2.setPixmap(self.my_image2)
+	def on_change_r2(self):
+		self.video_label_r2.setPixmap(QPixmap('image_r2.jpg'))
 
 	def handleButton(self):
 		print ('Hello World')
