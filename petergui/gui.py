@@ -41,7 +41,7 @@ class Thread(QThread):
 			connection.close()
 			server_socket.close()
 				
-			
+# Main application GUI
 class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
@@ -51,9 +51,9 @@ class MainWindow(QWidget):
 		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
 		self.robot_label_r1 = QLabel("Robot 1",self)
 		self.robot_label_r2 = QLabel("Robot 2",self)
-		self.slow_stop_button_r1 = QPushButton('STOP/SLOW', self)
+		self.slow_stop_button_r1 = QPushButton('Robot1 STOP/SLOW', self)
 		self.slow_stop_button_r1.clicked.connect(self.handleButton)
-		self.slow_stop_button_r2 = QPushButton('STOP/SLOW', self)
+		self.slow_stop_button_r2 = QPushButton('Robot2 2STOP/SLOW', self)
 		self.slow_stop_button_r2.clicked.connect(self.handleButton)
 		
 		#SETTING POSITION
