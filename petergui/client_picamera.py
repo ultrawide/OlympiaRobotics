@@ -1,31 +1,37 @@
-from picamera import PiCamera
-import zmq
-from time import sleep
-import base64
 import io
+import socket
+import struct
+import time
+import picamera
 
-context = zmq.Context()
-print("Connecting to server...")
-socket = context.socket(zmq.REQ)
-socket.connect("tcp://207.23.206.18:8000")
-print("\n Connected")
+# Connect a client socket to my_server:8000 (change my_server to the
+# hostname of your server)
+client_socket = socket.socket()
+client_socket.connect(('my_server', 8000))
 
-camera = PiCamera(resolution=(640,480))
+# Make a file-like object out of the connection
+connection = client_socket.makefile('wb')
+try:
+    camera = picamera.PiCamera()
+    camera.resolution = (640, 480)
+    # let the camera warm up for 2 seconds
+    time.sleep(2)
 
-while True:
-
-	try:
-            camera.start_preview()
-	    stream = io.BytesIO()
-            camera.capture(stream, format='jpeg', use_video_port=True)
-	    stream.seek(0)
-            camera.stop_preview()
-            image = base64.b64encode(stream.getvalue())
-            socket.send(image)
-            socket.recv()
-
-	except KeyboardInterrupt:
-		#cam.release()
-
-		print("\n\nBye bye\n")
-		break
+    stream = io.BytesIO()
+    for foo in camera.capture_continuous(stream, 'jpeg'):
+        # Write the length of the capture to the stream and flush to
+        # ensure it actually gets sent
+        connection.write(struct.pack('<L', stream.tell()))
+        connection.flush()
+        # Rewind the stream and send the image data over the wire
+        stream.seek(0)
+        connection.write(stream.read())
+        # Reset the stream for the next capture
+        stream.seek(0)
+        stream.truncate()
+	
+    # Write a length of zero to the stream to signal we're done
+    connection.write(struct.pack('<L', 0))
+finally:
+    connection.close()
+    client_socket.close()
