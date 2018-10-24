@@ -8,7 +8,7 @@ import picamera
 # hostname of your server)
 my_server = '0.0.0.0' # edit me
 client_socket = socket.socket()
-client_socket.connect(('my_server', 8000))
+client_socket.connect(('my_server', 8000))  # For Robot 1 its 8000 and for robot 2 its 8001
 
 # Make a file-like object out of the connection
 connection = client_socket.makefile('wb')
