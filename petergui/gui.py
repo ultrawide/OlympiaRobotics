@@ -25,7 +25,7 @@ class Thread(QThread):
 		try:
 			self.running = True
 			while self.running:
-				image_len = struct_unpack('<L', connection.read(struct.calcsize('<L')))[0]
+				image_len = struct.unpack('<L', connection.read(struct.calcsize('<L')))[0]
 				# if the image length is 0 quit the loop and stop the thread
 				if not image_len:
 					self.running = False
