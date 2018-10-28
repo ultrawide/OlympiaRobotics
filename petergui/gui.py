@@ -6,6 +6,7 @@ import sys
 import time
 import socket
 import struct
+import io
 #from PIL import Image
 
 # This thread reads the image from the robot's camera
@@ -35,23 +36,25 @@ class Thread(QThread):
 				image_stream.write(connection.read(image_len))
 				image_stream.seek(0)
 				
-				with open(self.image_loc, 'wb') as out:
-					out.write(image_stream.read())
-
+				#with open(self.image_loc, 'wb') as out:
+				#	out.write(image_stream.read())
+				out = open(self.image_loc,'wb')
+				out.write(image_stream.read())
+				out.close()
 				#image = Image.open(image_stream)
 				self.sig.emit() # emit a signal to tell the gui its time to update the lable image
 
 		finally:
 			connection.close()
-			server_socket.close()
+			self.server_socket.close()
 				
 # Main application GUI
 class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
-		location_r1 = 'image_r1.jpg'
-		location_r2 = 'image_r2.jpg'
+		self.location_r1 = 'image_r1.jpg'
+		self.location_r2 = 'image_r2.jpg'
 
 		self.video_label_r1 = QLabel('Robot 1 Video Feed Unavailable', self)
 		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
@@ -71,19 +74,19 @@ class MainWindow(QWidget):
 		self.slow_stop_button_r1.setGeometry(10,550,640,100)
 		self.slow_stop_button_r2.setGeometry(720,550,640,100)
 		
-		self.video_reader_r1 = Thread('192.168.0.188', 8000, location_r1)  # Colin edit address
-		self.video_reader_r2 = Thread('192.168.0.188', 8001, location_r2)  # Colin edit address
+		self.video_reader_r1 = Thread('207.23.165.58', 8000, self.location_r1)  # Linda edit address
+		self.video_reader_r2 = Thread('207.23.165.58', 8001, self.location_r2)  # Linda edit address
 		self.video_reader_r1.start()
 		self.video_reader_r2.start()
 		self.video_reader_r1.sig.connect(self.on_change_r1)
 		self.video_reader_r2.sig.connect(self.on_change_r2)
 		self.show()
 
-	def on_change_r1(self, location):
-		self.video_label_r1.setPixmap(QPixmap(location))
+	def on_change_r1(self):
+		self.video_label_r1.setPixmap(QPixmap(self.location_r1))
 
-	def on_change_r2(self, location):
-		self.video_label_r2.setPixmap(QPixmap(location))
+	def on_change_r2(self):
+		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
 	def handleButton(self):
 		print ('Hello World')
