@@ -7,7 +7,12 @@ import time
 import socket
 import struct
 import io
+import zmq
 #from PIL import Image
+
+context = zmq.Context()
+s = context.socket(zmq.REP)
+s.bind("tcp://207.23.165.58:8002")
 
 # This thread reads the image from the robot's camera
 class Thread(QThread):
@@ -47,7 +52,7 @@ class Thread(QThread):
 		finally:
 			connection.close()
 			self.server_socket.close()
-				
+			
 # Main application GUI
 class MainWindow(QWidget):
 
@@ -82,6 +87,13 @@ class MainWindow(QWidget):
 		self.video_reader_r2.sig.connect(self.on_change_r2)
 		self.show()
 
+		#--------------------------------------------------------------------#
+		#Sending Character
+		
+		#--------------------------------------------------------------------#
+
+
+
 	def on_change_r1(self):
 		self.video_label_r1.setPixmap(QPixmap(self.location_r1))
 
@@ -89,7 +101,16 @@ class MainWindow(QWidget):
 		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
 	def handleButton(self):
-		print ('Hello World')
+		print ('Sending a character')
+		data = 'D'
+		#self.s.send(data.encode('utf-8')) 
+		#self.s.recv()
+		response = s.recv()
+		print(response)
+		s.send(data.encode('utf-8')) 
+		print("Sent the character")
+		#response = self.s.recv().decode('utf-8')
+		#print(response) 
 
 if __name__ == '__main__':
 
