@@ -56,61 +56,70 @@ class Thread(QThread):
 # Main application GUI
 class MainWindow(QWidget):
 
-	def __init__(self, *args, **kwargs):
-		QWidget.__init__(self, *args, **kwargs)
-		self.location_r1 = 'image_r1.jpg'
-		self.location_r2 = 'image_r2.jpg'
+    
+    def __init__(self, *args, **kwargs):
+        QWidget.__init__(self, *args, **kwargs)
+        self.set_slow = False
+        self.location_r1 = 'image_r1.jpg'
+        self.location_r2 = 'image_r2.jpg'
 
-		self.video_label_r1 = QLabel('Robot 1 Video Feed Unavailable', self)
-		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
-		self.robot_label_r1 = QLabel("Robot 1",self)
-		self.robot_label_r2 = QLabel("Robot 2",self)
-		self.slow_stop_button_r1 = QPushButton('Robot1 STOP/SLOW', self)
-		self.slow_stop_button_r1.clicked.connect(self.handleButton)
-		self.slow_stop_button_r2 = QPushButton('Robot2 2STOP/SLOW', self)
-		self.slow_stop_button_r2.clicked.connect(self.handleButton)
-		
-		#SETTING POSITION
-		#horizontal,vertical, size_horizontal, size_vertical
-		self.robot_label_r1.setGeometry(10,10,480,30)
-		self.robot_label_r2.setGeometry(720,10,480,30)
-		self.video_label_r1.setGeometry(10,50,640,480)
-		self.video_label_r2.setGeometry(720,50,640,480)
-		self.slow_stop_button_r1.setGeometry(10,550,640,100)
-		self.slow_stop_button_r2.setGeometry(720,550,640,100)
-		
-		self.video_reader_r1 = Thread('207.23.165.58', 8000, self.location_r1)  # Linda edit address
-		self.video_reader_r2 = Thread('207.23.165.58', 8001, self.location_r2)  # Linda edit address
-		self.video_reader_r1.start()
-		self.video_reader_r2.start()
-		self.video_reader_r1.sig.connect(self.on_change_r1)
-		self.video_reader_r2.sig.connect(self.on_change_r2)
-		self.show()
+        self.video_label_r1 = QLabel('Robot 1 Video Feed Unavailable', self)
+        self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
+        self.robot_label_r1 = QLabel("Robot 1",self)
+        self.robot_label_r2 = QLabel("Robot 2",self)
+        self.slow_stop_button_r1 = QPushButton('Robot1 STOP/SLOW', self)
+        self.slow_stop_button_r1.clicked.connect(self.handleButton)
+        self.slow_stop_button_r2 = QPushButton('Robot2 2STOP/SLOW', self)
+        self.slow_stop_button_r2.clicked.connect(self.handleButton)
 
-		#--------------------------------------------------------------------#
-		#Sending Character
-		
-		#--------------------------------------------------------------------#
+        #SETTING POSITION
+        #horizontal,vertical, size_horizontal, size_vertical
+        self.robot_label_r1.setGeometry(10,10,480,30)
+        self.robot_label_r2.setGeometry(720,10,480,30)
+        self.video_label_r1.setGeometry(10,50,640,480)
+        self.video_label_r2.setGeometry(720,50,640,480)
+        self.slow_stop_button_r1.setGeometry(10,550,640,100)
+        self.slow_stop_button_r2.setGeometry(720,550,640,100)
 
+        self.video_reader_r1 = Thread('10.0.0.92', 8000, self.location_r1)  # Linda edit address
+        self.video_reader_r2 = Thread('10.0.0.92', 8001, self.location_r2)  # Linda edit address
+        self.video_reader_r1.start()
+        self.video_reader_r2.start()
+        self.video_reader_r1.sig.connect(self.on_change_r1)
+        self.video_reader_r2.sig.connect(self.on_change_r2)
+        self.show()
 
+    def on_change_r1(self):
+        self.video_label_r1.setPixmap(QPixmap(self.location_r1))
 
-	def on_change_r1(self):
-		self.video_label_r1.setPixmap(QPixmap(self.location_r1))
+    def on_change_r2(self):
+        self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
-	def on_change_r2(self):
-		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
-
-	def handleButton(self):
-		print ('Sending a character')
-		data = 'D'
-		#self.s.send(data.encode('utf-8')) 
-		#self.s.recv()
-		response = s.recv()
-		print(response)
-		s.send(data.encode('utf-8')) 
-		print("Sent the character")
-		#response = self.s.recv().decode('utf-8')
-		#print(response) 
+    def handleButton(self):
+        if (self.set_slow == False):
+        
+            print ("Controller sent STOP signal")
+            s.recv()
+            s.send(b"6")
+            self.set_slow = True
+        
+        else:
+        
+            print ("Controller sent SLOW signal")
+            s.recv()
+            s.send(b"5")
+            self.set_slow = False
+        
+        """ print ('Sending a character')
+        data = 'D'
+        #self.s.send(data.encode('utf-8')) 
+        #self.s.recv()
+        response = s.recv()
+        print(response)
+        s.send(data.encode('utf-8')) 
+        print("Sent the character")
+        #response = self.s.recv().decode('utf-8')
+        #print(response)  """
 
 if __name__ == '__main__':
 
