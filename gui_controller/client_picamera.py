@@ -13,7 +13,7 @@ import smbus #for i2c
 import pigpio
 # Connect a client socket to my_server:8000 (change my_server to the
 # hostname of your server)
-my_server = '10.0.0.92' # edit me
+my_server = '207.23.201.64' # edit me
 client_socket = socket.socket()
 client_socket.connect((my_server, 8000))  # For Robot 1 its 8000 and for robot 2 its 8001
 # Make a file-like object out of the connection
@@ -22,13 +22,15 @@ print("Established pipe for video stream")
 
 context = zmq.Context()
 socket = context.socket(zmq.REQ)
-socket.connect("tcp://10.0.0.92:8002")
+socket.connect("tcp://" + my_server + ":8002")
 print("Established pipe for command listening")
 
 # Communicate over I2C
 bus = smbus.SMBus(1) # 1 indicates /dev/i2c-1
+bus_arduino = smbus.SMBus(1) # 0 indicates /dev/i2c-0
 
 address = 0x06
+address_arduino = 0x04
 
 def writeNumber(value):
 	bus.write_byte(address, value)
@@ -40,7 +42,7 @@ def readNumber():
 # I2C end
 
 #------------------------------- Ada Fruit setup -----------------------
-pwm = Adafruit_PCA9685.PCA9685()
+#pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
 servo_min = 150  # Min pulse length out of 4096
 servo_max = 600  # Max pulse length out of 4096
 def set_servo_pulse(channel, pulse):
@@ -52,7 +54,7 @@ def set_servo_pulse(channel, pulse):
     pulse *= 1000
     pulse //= pulse_length
     pwm.set_pwm(channel, 0, pulse)
-pwm.set_pwm_freq(50)
+    pwm.set_pwm_freq(50)
 #------------------------------- Lowers Robot stop hand  -----------------------
 def arm_down(cur_pos, end_pos):
     pos = cur_pos
@@ -102,16 +104,22 @@ def processCommand():
             #message = socket.recv().decode('utf-8')
             message = socket.recv()
             if message == "5":
-                print "set RoboFlagger to 'Stop' configuration"
+                print("set RoboFlagger to 'Stop' configuration")
                 pwm.set_pwm(0, 0, 400)
                 pwm.set_pwm(1, 0, servo_min)
                 #socket.send(b"Set RoboFlagger to 'Stop' configuration")
             elif message == "6":
-                print "set RoboFlagger to 'Slow' Configuration"
+                print("set RoboFlagger to 'Slow' Configuration")
                 pwm.set_pwm(1, 0, servo_max)
                 arm_down(400, servo_min)
                 #pwm.set_pwm(1, 0, servo_max)
                 #socket.send(b"set RoboFlagger to 'Slow' configuration")
+            elif message == "7": #get car count
+                print("Retrieving car count from arduino")
+                bus_arduino.write_byte(address_arduino, 1)
+                time.sleep(1)
+                carCount = bus.read_byte(address_arduino)
+                print("I received car count: ", carCount)
             #else:
                  #socket.send(b"Option not implemented")
     except KeyboardInterrupt:
