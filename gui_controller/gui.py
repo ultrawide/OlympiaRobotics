@@ -9,11 +9,44 @@ import struct
 import io
 import zmq
 import time
+
 #from PIL import Image
 
 context = zmq.Context()
 s = context.socket(zmq.REP)
-s.bind("tcp://207.23.201.64:8002")
+serverAddress = ("207.23.201.64") ##Edit Here = IP 
+s.bind("tcp://"+serverAddress+":8002")
+
+#Global Variable
+carCount1 = 0
+
+#This thread gets the car count from the robot
+class CarCountThread(QThread):
+	#sig = pyqtSignal()
+	sig = pyqtSignal(str)
+	server_socket = None
+	def _init_(self, address, port, location, parent=None):
+		super(QThread, self).__init__()
+	
+	def run(self):
+		#connection = self.server_socket.accept()[0].makefile('rb')
+		print("Car Counting Thread Started")
+		try:
+			self.running = True
+			while self.running:
+				carCount1 = s.recv().decode('utf-8')
+				#Colin needs to send empty string when he starts the program
+				##So this is to ignore that empty string 
+				if carCount1 == "":
+					print("ignore")
+				else:
+					self.sig.emit(carCount1)
+					
+				time.sleep(0.5)
+				s.send(b"7")
+
+		finally:
+			print("Car Thread done")
 
 # This thread reads the image from the robot's camera
 class Thread(QThread):
@@ -133,25 +166,29 @@ class MainWindow(QWidget):
 		self.robot_car_number_r2.setGeometry(970, 10, 480, 30)
 		self.car_number_r1.setGeometry(440, 10, 480, 30)
 		self.car_number_r2.setGeometry(1150, 10, 480, 30)
-		self.display_r1.setGeometry(60, 650, 530, 50)
-		self.display_r2.setGeometry(770, 650, 530, 50)
-		self.comboBox_r1.setGeometry(60,700,530,50)
-		self.comboBox_r2.setGeometry(770,700,530,50)
-		self.EmergencyApproach_r1.setGeometry(10, 40, 400, 30)
-		self.EmergencyApproach_r2.setGeometry(720, 40, 400, 30)
-		self.EmergencyThere_r1.setGeometry(420, 40, 50, 30)
-		self.EmergencyThere_r2.setGeometry(1140, 40, 50, 30)
+		self.display_r1.setGeometry(60, 625, 530, 50)
+		self.display_r2.setGeometry(770, 625, 530, 50)
+		self.comboBox_r1.setGeometry(60,650,530,50)
+		self.comboBox_r2.setGeometry(770,650,530,50)
+		self.EmergencyApproach_r1.setGeometry(10, 30, 400, 30)
+		self.EmergencyApproach_r2.setGeometry(720, 30, 400, 30)
+		self.EmergencyThere_r1.setGeometry(420, 30, 50, 30)
+		self.EmergencyThere_r2.setGeometry(1140, 30, 50, 30)
 		self.Graphic_r1.setGeometry(130, 10, 50, 30)
 		self.Graphic_r2.setGeometry(840, 10, 50, 30)
 		# *******************************************************************************
 
 		
-		self.video_reader_r1 = Thread('207.23.201.64', 8000, self.location_r1)  # Linda edit address
-		self.video_reader_r2 = Thread('207.23.201.64', 8001, self.location_r2)  # Linda edit address
+		self.video_reader_r1 = Thread(serverAddress, 8000, self.location_r1)  # Linda edit address
+		self.video_reader_r2 = Thread(serverAddress, 8001, self.location_r2)  # Linda edit address
 		self.video_reader_r1.start()
 		self.video_reader_r2.start()
 		self.video_reader_r1.sig.connect(self.on_change_r1)
 		self.video_reader_r2.sig.connect(self.on_change_r2)
+		self.car_count_r1 = CarCountThread()
+		self.car_count_r1.start()
+		self.car_count_r1.sig.connect(self.CarCounting_Robot1)
+		
 		self.show()
 
 		#--------------------------------------------------------------------#
@@ -168,7 +205,7 @@ class MainWindow(QWidget):
 		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
 	def handleButton(self):
-		if (self.set_slow == False):
+		"""if (self.set_slow == False):
 			print ("Controller sent STOP signal")
 			s.recv()
 			s.send(b"6")
@@ -177,8 +214,11 @@ class MainWindow(QWidget):
 			print ("Controller sent SLOW signal")
 			s.recv()
 			s.send(b"5")
-			self.set_slow = False
-			
+			self.set_slow = False"""
+		s.recv()
+		s.send(b"7")
+		print("Sending 7")
+
 		#************************added*********************************
 		#need to specify when it is stop and slow
 		#robot 1
@@ -249,15 +289,15 @@ class MainWindow(QWidget):
 
 
 	# *************************************added**************************************
-	def CarCounting(self):
+	def CarCounting_Robot1(self, value):
 		#not sure if the number of you are reading from sensors is string or integer
 		#But assuming it is integer, however, the function needs to be adjusted according to the way
 		#data are read
 		#this is just for testing the function
-		carNumber1 = 1
-		carNumber2 = 1
-		self.car_number_r1.setText(str(carNumber1))
-		self.car_number_r2.setText(str(carNumber2))
+		#carNumber1 = 1
+		#carNumber2 = 1
+		self.car_number_r1.setText(str(value))
+		#self.car_number_r2.setText(str(carNumber2))
 
 	def styleChoice(self, text):
 		#need to distinguish between robot 1 or 2 -> not yet
