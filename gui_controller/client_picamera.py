@@ -15,7 +15,7 @@ import pigpio
 # hostname of your server)
 my_server = '207.23.201.64' # edit me
 client_socket = socket.socket()
-client_socket.connect((my_server, 8000))  # For Robot 1 its 8000 and for robot 2 its 8001
+client_socket.connect((my_server, 8001))  # For Robot 1 its 8000 and for robot 2 its 8001
 # Make a file-like object out of the connection
 connection = client_socket.makefile('wb')
 print("Established pipe for video stream")
@@ -24,6 +24,10 @@ context = zmq.Context()
 socket = context.socket(zmq.REQ)
 socket.connect("tcp://" + my_server + ":8002")
 print("Established pipe for command listening")
+
+# For sending car count for robot 1
+socket2 = context.socket(zmq.REQ)
+socket2.connect("tcp://" + my_server + ":8004") # robot1: port 8003, robot2: port 8004 
 
 # Communicate over I2C
 bus = smbus.SMBus(1) # 1 indicates /dev/i2c-1
@@ -119,8 +123,8 @@ def processCommand():
                 time.sleep(0.05)
                 carCount = readNumber(address_arduino)
                 print("From Arduino, I received car count: ", carCount)
-                socket.send(str(carCount).encode('utf-8'))
-                message = socket.recv()
+                socket2.send(str(carCount).encode('utf-8'))
+                message = socket2.recv()
             #else:
                  #socket.send(b"Option not implemented")
     except KeyboardInterrupt:
@@ -131,6 +135,27 @@ def processCommand():
         except SystemExit:
             os._exit(0)
 
+def carCount():
+    try:
+        while True:
+            socket2.send(''.encode('utf-8'))
+            message = socket2.recv()
+            if message == "7": #get car count
+		print("Retrieving car count from arduino")
+		writeNumber(address_arduino, 1)
+		time.sleep(0.05)
+		carCount = readNumber(address_arduino)
+		print("From Arduino, I received car count: ", carCount)
+		socket2.send(str(carCount).encode('utf-8'))
+		message = socket2.recv()
+    except KeyboardInterrupt:
+	print("process command interrupted")
+	try:
+	    socket.close()
+	    sys.exit(0)
+	except SystemExit:
+	    os._exit(0)
+
 if __name__ == "__main__":
     video_thread = Thread(target = sendVideo)
     video_thread.start()
@@ -139,3 +164,5 @@ if __name__ == "__main__":
     command_thread = Thread(target = processCommand)
     command_thread.start()
 
+    car_count_thread = Thread(target = carCount)
+    car_count_thread.start()
