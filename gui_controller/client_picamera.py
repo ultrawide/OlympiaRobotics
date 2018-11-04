@@ -27,16 +27,15 @@ print("Established pipe for command listening")
 
 # Communicate over I2C
 bus = smbus.SMBus(1) # 1 indicates /dev/i2c-1
-bus_arduino = smbus.SMBus(1) # 0 indicates /dev/i2c-0
 
-address = 0x06
+address = 0x08
 address_arduino = 0x04
 
-def writeNumber(value):
+def writeNumber(address, value):
 	bus.write_byte(address, value)
 	#print("Sent to Arduino: ", value)
 
-def readNumber():
+def readNumber(address):
 	number = bus.read_byte(address)
 	return number
 # I2C end
@@ -100,7 +99,7 @@ def sendVideo():
 def processCommand():
     try:
         while True:
-            socket.send_string('')
+            socket.send(''.encode('utf-8'))
             #message = socket.recv().decode('utf-8')
             message = socket.recv()
             if message == "5":
@@ -116,10 +115,12 @@ def processCommand():
                 #socket.send(b"set RoboFlagger to 'Slow' configuration")
             elif message == "7": #get car count
                 print("Retrieving car count from arduino")
-                bus_arduino.write_byte(address_arduino, 1)
-                time.sleep(1)
-                carCount = bus.read_byte(address_arduino)
-                print("I received car count: ", carCount)
+                writeNumber(address_arduino, 1)
+                time.sleep(0.05)
+                carCount = readNumber(address_arduino)
+                print("From Arduino, I received car count: ", carCount)
+                socket.send(str(carCount).encode('utf-8'))
+                message = socket.recv()
             #else:
                  #socket.send(b"Option not implemented")
     except KeyboardInterrupt:
