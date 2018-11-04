@@ -12,16 +12,28 @@ import time
 
 #from PIL import Image
 
+serverAddress = ("207.23.201.64") ##Edit Here = IP 
+
+#Robot 1/2 Process Command Button 
 context = zmq.Context()
 s = context.socket(zmq.REP)
-serverAddress = ("207.23.201.64") ##Edit Here = IP 
 s.bind("tcp://"+serverAddress+":8002")
+
+#Robot 1 Car Count
+s2 = context.socket(zmq.REP)
+s2.bind("tcp://"+serverAddress+":8003")
+
+#Robot 2 Car Count
+s3 = context.socket(zmq.REP)
+s3.bind("tcp://"+serverAddress+":8004")
+
 
 #Global Variable
 carCount1 = 0
+carCount2 = 0
 
 #This thread gets the car count from the robot
-class CarCountThread(QThread):
+class CarCountThread1(QThread):
 	#sig = pyqtSignal()
 	sig = pyqtSignal(str)
 	server_socket = None
@@ -34,16 +46,42 @@ class CarCountThread(QThread):
 		try:
 			self.running = True
 			while self.running:
-				carCount1 = s.recv().decode('utf-8')
+				carCount1 = s2.recv().decode('utf-8')
 				#Colin needs to send empty string when he starts the program
-				##So this is to ignore that empty string 
+				#So this is to ignore that empty string 
 				if carCount1 == "":
 					print("ignore")
 				else:
 					self.sig.emit(carCount1)
 					
 				time.sleep(0.5)
-				s.send(b"7")
+				s2.send(b"7")
+
+		finally:
+			print("Car Thread done")
+
+class CarCountThread2(QThread):
+	sig = pyqtSignal(str)
+	server_socket = None
+	def _init_(self, address, port, location, parent=None):
+		super(QThread, self).__init__()
+	
+	def run(self):
+		#connection = self.server_socket.accept()[0].makefile('rb')
+		print("Car Counting Thread 2 Started")
+		try:
+			self.running = True
+			while self.running:
+				carCount2 = s3.recv().decode('utf-8')
+				#Colin needs to send empty string when he starts the program
+				#So this is to ignore that empty string 
+				if carCount2 == "":
+					print("ignore")
+				else:
+					self.sig.emit(carCount2)
+					
+				time.sleep(0.5)
+				s3.send(b"7")
 
 		finally:
 			print("Car Thread done")
@@ -185,9 +223,12 @@ class MainWindow(QWidget):
 		self.video_reader_r2.start()
 		self.video_reader_r1.sig.connect(self.on_change_r1)
 		self.video_reader_r2.sig.connect(self.on_change_r2)
-		self.car_count_r1 = CarCountThread()
+		self.car_count_r1 = CarCountThread1()
 		self.car_count_r1.start()
+		self.car_count_r2 = CarCountThread2()
+		self.car_count_r2.start()
 		self.car_count_r1.sig.connect(self.CarCounting_Robot1)
+		self.car_count_r2.sig.connect(self.CarCounting_Robot2)
 		
 		self.show()
 
@@ -298,6 +339,9 @@ class MainWindow(QWidget):
 		#carNumber2 = 1
 		self.car_number_r1.setText(str(value))
 		#self.car_number_r2.setText(str(carNumber2))
+
+	def CarCounting_Robot2(self, value):
+		self.car_number_r2.setText(str(value))
 
 	def styleChoice(self, text):
 		#need to distinguish between robot 1 or 2 -> not yet
