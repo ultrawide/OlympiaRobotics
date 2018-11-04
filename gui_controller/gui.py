@@ -27,7 +27,6 @@ s2.bind("tcp://"+serverAddress+":8003")
 s3 = context.socket(zmq.REP)
 s3.bind("tcp://"+serverAddress+":8004")
 
-
 #Global Variable
 carCount1 = 0
 carCount2 = 0
@@ -90,6 +89,7 @@ class CarCountThread2(QThread):
 class Thread(QThread):
 	sig = pyqtSignal()
 	server_socket = None
+
 	def __init__(self, address, port, location, parent=None):
 		super(QThread, self).__init__()
 		self.image_loc = location
@@ -130,6 +130,8 @@ class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
+		self.robot1SwapStatus = False
+		self.robot2SwapStatus = False
 		self.set_slow = False
 		self.location_r1 = 'image_r1.jpg'
 		self.location_r2 = 'image_r2.jpg'
@@ -139,9 +141,9 @@ class MainWindow(QWidget):
 		self.robot_label_r1 = QLabel("Robot 1",self)
 		self.robot_label_r2 = QLabel("Robot 2",self)
 		self.slow_stop_button_r1 = QPushButton('Robot1 STOP/SLOW', self)
-		self.slow_stop_button_r1.clicked.connect(self.handleButton)
+		self.slow_stop_button_r1.clicked.connect(self.handleButton_r1)
 		self.slow_stop_button_r2 = QPushButton('Robot2 2STOP/SLOW', self)
-		self.slow_stop_button_r2.clicked.connect(self.handleButton)
+		self.slow_stop_button_r2.clicked.connect(self.handleButton_r2)
 
 
 		#*************************************added**************************************
@@ -245,27 +247,29 @@ class MainWindow(QWidget):
 	def on_change_r2(self):
 		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
-	def handleButton(self):
-		"""if (self.set_slow == False):
+	def handleButton_r1(self):
+		if (self.set_slow == False):
 			print ("Controller sent STOP signal")
-			s.recv()
-			s.send(b"6")
+			#s.recv()
+			#s.send(b"6")
+			self.robot1SwapStatus = True # Condition 1
 			self.set_slow = True
 		else:
 			print ("Controller sent SLOW signal")
-			s.recv()
-			s.send(b"5")
-			self.set_slow = False"""
-		s.recv()
-		s.send(b"7")
-		print("Sending 7")
-
+			#s.recv()
+			#s.send(b"5")
+			if self.robot1SwapStatus == True:
+				self.robot2SwapStatus = True # Condition 2
+			self.set_slow = False
+		if (self.robot1SwapStatus == True and self.robot2SwapStatus == True):
+			self.robot1SwapStatus = False
+			self.robot2SwapStatus = False
 		#************************added*********************************
 		#need to specify when it is stop and slow
 		#robot 1
 		#if stop, change to slow
 		if self.slow_stop_button_r1.isChecked():
-			self.slow_stop_button_r1.setText("Robot2 STOP/SLOW: SLOW")
+			self.slow_stop_button_r1.setText("Robot1 STOP/SLOW: SLOW")
 			self.slow_stop_button_r1.setCheckable(False)
 			self.slow_stop_button_r1.setStyleSheet("color: orange")
 			# changing graphic accordingly
@@ -278,7 +282,7 @@ class MainWindow(QWidget):
 			self.styleChoice("Proceed Slowly")
 		#if slow change to stop
 		else:
-			self.slow_stop_button_r1.setText("Robot2 STOP/SLOW: STOP")
+			self.slow_stop_button_r1.setText("Robot1 STOP/SLOW: STOP")
 			self.slow_stop_button_r1.setCheckable(True)
 			self.slow_stop_button_r1.setStyleSheet("color: red")
 			# changing graphic accordingly
@@ -289,6 +293,25 @@ class MainWindow(QWidget):
 			# setting display message
 			self.comboBox_r1.setCurrentIndex(0)
 			self.styleChoice("Stop!")
+
+	def handleButton_r2(self):
+		if (self.set_slow == False):
+			print ("Controller sent STOP signal")
+			#s.recv()
+			#s.send(b"6")
+			self.robot1SwapStatus = True # Condition 1
+			self.set_slow = True
+		else:
+			print ("Controller sent SLOW signal")
+			#s.recv()
+			#s.send(b"5")
+			if self.robot1SwapStatus == True:
+				self.robot2SwapStatus = True # Condition 2
+			self.set_slow = False
+		if (self.robot1SwapStatus == True and self.robot2SwapStatus == True):
+			self.robot1SwapStatus = False
+			self.robot2SwapStatus = False
+		
 		# robot 2
 		# if stop, change to slow
 		if self.slow_stop_button_r2.isChecked():
