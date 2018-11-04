@@ -104,7 +104,6 @@ def processCommand():
     try:
         while True:
             socket.send(''.encode('utf-8'))
-            #message = socket.recv().decode('utf-8')
             message = socket.recv()
             if message == "5":
                 print("set RoboFlagger to 'Stop' configuration")
@@ -117,14 +116,13 @@ def processCommand():
                 arm_down(400, servo_min)
                 #pwm.set_pwm(1, 0, servo_max)
                 #socket.send(b"set RoboFlagger to 'Slow' configuration")
-            elif message == "7": #get car count
-                print("Retrieving car count from arduino")
-                writeNumber(address_arduino, 1)
+            elif message == "8": # reset car count
+                print("Resetting car count from arduino")
+                writeNumber(address_arduino, 2)
                 time.sleep(0.05)
                 carCount = readNumber(address_arduino)
-                print("From Arduino, I received car count: ", carCount)
-                socket2.send(str(carCount).encode('utf-8'))
-                message = socket2.recv()
+                socket.send_string("")
+                message = socket.recv()
             #else:
                  #socket.send(b"Option not implemented")
     except KeyboardInterrupt:
