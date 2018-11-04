@@ -30,6 +30,9 @@ s3.bind("tcp://"+serverAddress+":8004")
 #Global Variable
 carCount1 = 0
 carCount2 = 0
+testVariable = 0
+#Hard coded for now, need another RP
+Robot1CarCount = 15
 
 #This thread gets the car count from the robot
 class CarCountThread1(QThread):
@@ -130,9 +133,8 @@ class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
-		self.robot1SwapStatus = False
-		self.robot2SwapStatus = False
-		self.set_slow = False
+		self.set_slow_r1 = False
+		self.set_slow_r2 = False 
 		self.location_r1 = 'image_r1.jpg'
 		self.location_r2 = 'image_r2.jpg'
 
@@ -140,12 +142,14 @@ class MainWindow(QWidget):
 		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
 		self.robot_label_r1 = QLabel("Robot 1",self)
 		self.robot_label_r2 = QLabel("Robot 2",self)
-		self.slow_stop_button_r1 = QPushButton('Robot1 STOP/SLOW', self)
+		self.slow_stop_button_r1 = QPushButton('Robot1: Swap to SLOW', self)
 		self.slow_stop_button_r1.clicked.connect(self.handleButton_r1)
-		self.slow_stop_button_r2 = QPushButton('Robot2 2STOP/SLOW', self)
+		self.slow_stop_button_r2 = QPushButton('Robot: Swap to SLOW', self)
 		self.slow_stop_button_r2.clicked.connect(self.handleButton_r2)
 
-
+		#Will be used for Resetting counter logic 
+		self.Robot1CarCount = 0
+		self.Robot2CarCount = 0
 		#*************************************added**************************************
 		#car counting message
 		self.robot_car_number_r1 = QLabel("Cars passed= ", self)
@@ -174,8 +178,8 @@ class MainWindow(QWidget):
 		self.EmergencyThere_r2 = QLabel("No", self)
 		self.Emergency_vehicle()
 		#setting buttons to stop and setting the color to res
-		self.slow_stop_button_r1.setStyleSheet("color: red")
-		self.slow_stop_button_r2.setStyleSheet("color: red")
+		self.slow_stop_button_r1.setStyleSheet("color: orange")
+		self.slow_stop_button_r2.setStyleSheet("color: orange")
 		#to distinguish between stop and slow. (stop -> true, slow-> false)
 		self.slow_stop_button_r1.setCheckable(True)
 		self.slow_stop_button_r1.setCheckable(True)
@@ -239,7 +243,7 @@ class MainWindow(QWidget):
 		
 		#--------------------------------------------------------------------#
 
-
+	
 
 	def on_change_r1(self):
 		self.video_label_r1.setPixmap(QPixmap(self.location_r1))
@@ -248,43 +252,32 @@ class MainWindow(QWidget):
 		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
 
 	def handleButton_r1(self):
-		if (self.set_slow == False):
+		if (self.set_slow_r1 == False):
 			print ("Controller sent STOP signal")
+
 			#s.recv()
 			#s.send(b"6")
-			self.robot1SwapStatus = True # Condition 1
-			self.set_slow = True
+			self.set_slow_r1 = True
 		else:
 			print ("Controller sent SLOW signal")
+			#Logic for Resetting Car Count
+			if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
+				s.recv()
+				#Sending Reset Command to Raspberry Pi
+				s.send(b"8")
 			#s.recv()
 			#s.send(b"5")
-			if self.robot1SwapStatus == True:
-				self.robot2SwapStatus = True # Condition 2
-			self.set_slow = False
-		if (self.robot1SwapStatus == True and self.robot2SwapStatus == True):
-			self.robot1SwapStatus = False
-			self.robot2SwapStatus = False
+			self.set_slow_r1 = False
+			#s.recv()
+			#s.send(b"8")
 		#************************added*********************************
 		#need to specify when it is stop and slow
 		#robot 1
 		#if stop, change to slow
 		if self.slow_stop_button_r1.isChecked():
-			self.slow_stop_button_r1.setText("Robot1 STOP/SLOW: SLOW")
+			self.slow_stop_button_r1.setText("Robot1: Swap to SLOW")
 			self.slow_stop_button_r1.setCheckable(False)
 			self.slow_stop_button_r1.setStyleSheet("color: orange")
-			# changing graphic accordingly
-			self.pixmap_r1 = QPixmap('Slow.jpg')
-			self.Graphic_r1.setPixmap(self.pixmap_r1)
-			self.smaller_pixmap_r1 = self.pixmap_r1.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r1.setPixmap(self.smaller_pixmap_r1)
-			#setting display message
-			self.comboBox_r1.setCurrentIndex(1)
-			self.styleChoice("Proceed Slowly")
-		#if slow change to stop
-		else:
-			self.slow_stop_button_r1.setText("Robot1 STOP/SLOW: STOP")
-			self.slow_stop_button_r1.setCheckable(True)
-			self.slow_stop_button_r1.setStyleSheet("color: red")
 			# changing graphic accordingly
 			self.pixmap_r1 = QPixmap('Stop.png')
 			self.Graphic_r1.setPixmap(self.pixmap_r1)
@@ -293,44 +286,51 @@ class MainWindow(QWidget):
 			# setting display message
 			self.comboBox_r1.setCurrentIndex(0)
 			self.styleChoice("Stop!")
+			
+		#if slow change to stop
+		else:
+			self.slow_stop_button_r1.setText("Robot1: Swap to STOP")
+			self.slow_stop_button_r1.setCheckable(True)
+			self.slow_stop_button_r1.setStyleSheet("color: red")
+			# changing graphic accordingly
+			self.pixmap_r1 = QPixmap('Slow.jpg')
+			self.Graphic_r1.setPixmap(self.pixmap_r1)
+			self.smaller_pixmap_r1 = self.pixmap_r1.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
+			self.Graphic_r1.setPixmap(self.smaller_pixmap_r1)
+			#setting display message
+			self.comboBox_r1.setCurrentIndex(1)
+			self.styleChoice("Proceed Slowly")
 
 	def handleButton_r2(self):
-		if (self.set_slow == False):
+		if (self.set_slow_r2 == False):
 			print ("Controller sent STOP signal")
+			print(self.Robot1CarCount)
 			#s.recv()
 			#s.send(b"6")
-			self.robot1SwapStatus = True # Condition 1
-			self.set_slow = True
+			s.recv() #take out later
+			s.send(b"8") #take out later 
+			self.set_slow_r2 = True
 		else:
 			print ("Controller sent SLOW signal")
+			#Logic for Resetting Car Count
+			s.recv() #take out later
+			s.send(b"8") #take out later 
+			if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
+				s.recv()
+				#Sending Reset Command to Raspberry Pi
+				s.send(b"8")
 			#s.recv()
 			#s.send(b"5")
-			if self.robot1SwapStatus == True:
-				self.robot2SwapStatus = True # Condition 2
-			self.set_slow = False
-		if (self.robot1SwapStatus == True and self.robot2SwapStatus == True):
-			self.robot1SwapStatus = False
-			self.robot2SwapStatus = False
+			self.set_slow_r2 = False
+			#s.recv()
+			#s.send(b"8")
 		
 		# robot 2
 		# if stop, change to slow
-		if self.slow_stop_button_r2.isChecked():
-			self.slow_stop_button_r2.setText("Robot2 STOP/SLOW: SLOW")
-			self.slow_stop_button_r2.setCheckable(False)
+		if self.set_slow_r2 == False:
+			# Controller sent stop signal
+			self.slow_stop_button_r2.setText("Robot2: Swap to SLOW")
 			self.slow_stop_button_r2.setStyleSheet("color: orange")
-			#changing graphic accordingly
-			self.pixmap_r2 = QPixmap('Slow.jpg')
-			self.Graphic_r2.setPixmap(self.pixmap_r2)
-			self.smaller_pixmap_r2 = self.pixmap_r2.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r2.setPixmap(self.smaller_pixmap_r2)
-			# setting display message
-			self.comboBox_r2.setCurrentIndex(1)
-			self.styleChoice("Proceed Slowly")
-		# if slow change to stop
-		else:
-			self.slow_stop_button_r2.setText("Robot2 STOP/SLOW: STOP")
-			self.slow_stop_button_r2.setCheckable(True)
-			self.slow_stop_button_r2.setStyleSheet("color: red")
 			# changing graphic accordingly
 			self.pixmap_r2 = QPixmap('Stop.png')
 			self.Graphic_r2.setPixmap(self.pixmap_r2)
@@ -339,6 +339,19 @@ class MainWindow(QWidget):
 			# setting display message
 			self.comboBox_r2.setCurrentIndex(0)
 			self.styleChoice("Stop!")
+		# if slow change to stop
+		else:
+			# Controller sent slow signal
+			self.slow_stop_button_r2.setText("Robot2: Swap to STOP")
+			self.slow_stop_button_r2.setStyleSheet("color: red")
+			#changing graphic accordingly
+			self.pixmap_r2 = QPixmap('Slow.jpg')
+			self.Graphic_r2.setPixmap(self.pixmap_r2)
+			self.smaller_pixmap_r2 = self.pixmap_r2.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
+			self.Graphic_r2.setPixmap(self.smaller_pixmap_r2)
+			# setting display message
+			self.comboBox_r2.setCurrentIndex(1)
+			self.styleChoice("Proceed Slowly")
 		#*************************************************************
 
 
@@ -361,10 +374,15 @@ class MainWindow(QWidget):
 		#carNumber1 = 1
 		#carNumber2 = 1
 		self.car_number_r1.setText(str(value))
+		self.Robot1CarCount = value
+		#self.Robot1CarCount = value
+		
+		
 		#self.car_number_r2.setText(str(carNumber2))
 
 	def CarCounting_Robot2(self, value):
 		self.car_number_r2.setText(str(value))
+		self.Robot2CarCount = value
 
 	def styleChoice(self, text):
 		#need to distinguish between robot 1 or 2 -> not yet
