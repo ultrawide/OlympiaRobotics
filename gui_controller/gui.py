@@ -9,6 +9,7 @@ import struct
 import io
 import zmq
 import time
+import queue
 
 # CONSTANTS
 VIDEO_WIDTH		= 640
@@ -24,7 +25,56 @@ R2_COUNT_PORT		= 8005
 
 SERVER_ADDRESS		= "192.168.0.188"
 
-
+# Replaces the CarCountWorker and 
+class RobotCommandWorker(QThread):
+	SET_SLOW_CONFIG_COMMAND = '1'
+	SET_STOP_CONFIG_COMMAND = '2'
+	REQ_CAR_COUNT = '3'
+	ZERO_CAR_COUNT = '4'
+	SHUTDOWN = '5'
+	# other commands
+	
+	sig = pyqtSignal(str)
+	command_queue = queue.Queue()  # need some kind of queue. can this one work? https://docs.python.org/3/library/queue.html
+	
+	def __init__(self, address, port, robot_name, parent=None):
+		self.car_count = 0
+		
+		# setup zmq network connection
+		
+	# when the robot needs to perform a command. add that command to the queue
+	def add_command(self, command):
+		# push a command onto the command queue
+		# must use locks
+		
+	def get_car_count(self):
+		# must use locks on
+				
+	def run(self):
+		print(self.robot_name + ' RobotCommandWorker started')
+		try:
+			self.running = True
+			while self.running:
+				# we are prioritizing the robot's movements rather
+				# if there is a command in the commond queue
+					# pop a command from the command queue
+					# disable the slow/stop button on the gui so the user can't keep pressing it
+					# send command to the robot over the network
+					# wait for robot's response
+					# send a signal to qt gui to update the slow/stop pic
+				# else when there is no command in the queue
+					# ask the robot for car count information
+					# wait for robots' response
+					# store that information in this class
+					# send a signal to qt gui to update the car count
+					
+				# if there are more commands don't delay processing them
+				# if we just got a car count delay and there are no commands 
+				# delay some short amount of time
+		finally:
+			print(self.robot_name + 'RobotCommandWorker done')
+		
+		
 # The CarCountWorker is a thread that updates the cars passed label of the robot with the
 # current number of cars that have travelled passed the robot
 class CarCountWorker(QThread):
@@ -241,6 +291,9 @@ class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
+		
+		# TODO (low priority) instead of hardcoding the SEVER_ADDRESS, R1_VIDEO_PORT, etc constants into the program, lets 
+		# read them from a config file
 
 		r1 = RobotControl('Robot 1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
 		r2 = RobotControl('Robot 2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
