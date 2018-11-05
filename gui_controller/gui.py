@@ -24,6 +24,7 @@ R2_COUNT_PORT		= 8005
 
 SERVER_ADDRESS		= "192.168.0.188"
 
+
 # The CarCountWorker is a thread that updates the cars passed label of the robot with the
 # current number of cars that have travelled passed the robot
 class CarCountWorker(QThread):
@@ -181,7 +182,7 @@ class RobotControl(QWidget):
 
 	def on_emergency_approach(self):
 		#TODO just to test the function and change the color when emergency vehicle is approaching
-		#need to be adjusted
+		           #need to be adjusted
 		emergency_desc_label.setStyleSheet('color: red')
 		emergency_ans_label.setStyleSheet('color: red')
 		emergency_ans_label.setText("Aproaching")
