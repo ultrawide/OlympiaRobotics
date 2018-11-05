@@ -10,90 +10,56 @@ import io
 import zmq
 import time
 
-#from PIL import Image
+# CONSTANTS
+VIDEO_WIDTH	= 640
+VIDEO_HEIGHT	= 480
 
-serverAddress = ("207.23.201.64") ##Edit Here = IP 
+R1_VIDEO_PORT	= 8000
+R1_COMMAND_PORT	= 8001
+R1_COUNT_PORT	= 8002
 
-#Robot 1/2 Process Command Button 
-context = zmq.Context()
-s = context.socket(zmq.REP)
-s.bind("tcp://"+serverAddress+":8002")
+R2_VIDEO_PORT	= 8003
+R2_COMMAND_PORT	= 8004
+R2_COUNT_PORT	= 8005
 
-#Robot 1 Car Count
-s2 = context.socket(zmq.REP)
-s2.bind("tcp://"+serverAddress+":8003")
+SERVER_ADDRESS = "192.168.0.188"
 
-#Robot 2 Car Count
-s3 = context.socket(zmq.REP)
-s3.bind("tcp://"+serverAddress+":8004")
-
-#Global Variable
-carCount1 = 0
-carCount2 = 0
-testVariable = 0
-#Hard coded for now, need another RP
-Robot1CarCount = 15
-
-#This thread gets the car count from the robot
-class CarCountThread1(QThread):
-	#sig = pyqtSignal()
+# The CarCountWorker is a thread that updates the cars passed label of the robot with the
+# current number of cars that have travelled passed the robot
+class CarCountWorker(QThread):
 	sig = pyqtSignal(str)
-	server_socket = None
-	def _init_(self, address, port, location, parent=None):
+
+	def __init__(self, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
+		self.robot_name = robot_name
+		context = zmq.Context()
+		self.socket = context.socket(zmq.REP)
+		self.socket.bind("tcp://" + str(address) + ":" + str(port))
 	
 	def run(self):
-		#connection = self.server_socket.accept()[0].makefile('rb')
-		print("Car Counting Thread Started")
+		print(self.robot_name + ' Car Counting Thread Started')
 		try:
 			self.running = True
 			while self.running:
-				carCount1 = s2.recv().decode('utf-8')
+				car_count = self.socket.recv().decode('utf-8')
+
 				#Colin needs to send empty string when he starts the program
 				#So this is to ignore that empty string 
-				if carCount1 == "":
-					print("ignore")
-				else:
-					self.sig.emit(carCount1)
-					
-				time.sleep(0.5)
-				s2.send(b"7")
-
-		finally:
-			print("Car Thread done")
-
-class CarCountThread2(QThread):
-	sig = pyqtSignal(str)
-	server_socket = None
-	def _init_(self, address, port, location, parent=None):
-		super(QThread, self).__init__()
-	
-	def run(self):
-		#connection = self.server_socket.accept()[0].makefile('rb')
-		print("Car Counting Thread 2 Started")
-		try:
-			self.running = True
-			while self.running:
-				carCount2 = s3.recv().decode('utf-8')
-				#Colin needs to send empty string when he starts the program
-				#So this is to ignore that empty string 
-				if carCount2 == "":
-					print("ignore")
-				else:
-					self.sig.emit(carCount2)
+				if car_count != '':
+					self.sig.emit(car_count)
 					
 				time.sleep(0.5)
 				s3.send(b"7")
 
 		finally:
-			print("Car Thread done")
+			print(self.robot_name + 'Car Thread done')
 
-# This thread reads the image from the robot's camera
-class Thread(QThread):
+# The FrameReaderWorker is a thread that reads video frames from the 
+# robot
+class FrameReaderWorker(QThread):
 	sig = pyqtSignal()
-	server_socket = None
 
-	def __init__(self, address, port, location, parent=None):
+	def __init__(self, address, port, location):
 		super(QThread, self).__init__()
 		self.image_loc = location
 		self.server_socket = socket.socket()
@@ -111,297 +77,181 @@ class Thread(QThread):
 				if not image_len:
 					self.running = False
 					break
+
 				# construct a stream to hold the image data and read the image
 				image_stream = io.BytesIO()
 				image_stream.write(connection.read(image_len))
 				image_stream.seek(0)
 				
-				#with open(self.image_loc, 'wb') as out:
-				#	out.write(image_stream.read())
-				out = open(self.image_loc,'wb')
-				out.write(image_stream.read())
-				out.close()
-				#image = Image.open(image_stream)
-				self.sig.emit() # emit a signal to tell the gui its time to update the lable image
+				with open(self.image_loc, 'wb') as out:
+					out.write(image_stream.read())
 
+				self.sig.emit() # emit a signal to tell the gui its time to update the label image
 		finally:
 			connection.close()
 			self.server_socket.close()
-			
+
+# RobotControl is a widget that controls a single robot		
+class RobotControl(QWidget):
+	def __init__(self, robot_name, server_address, video_port, command_port, count_port):
+		QWidget.__init__(self)
+		self.robot_name = robot_name
+		self.server_address = server_address
+		self.video_port = video_port
+		self.command_port = command_port
+		self.count_port = count_port
+		self.car_count = 0
+		self.emergency_vehicle = True
+		self.sign_slow = False
+		self.video_frame_file = robot_name + '_video.png'
+
+		# load graphics for sign_pos_label
+		self.stop_pic = QPixmap('Stop.png')
+		# TODO resize pic so we don't need to scale it
+		self.stop_pic = self.stop_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation) 
+		self.slow_pic = QPixmap('Slow.jpg')
+		# TODO resize pic so we don't need to scale it
+		self.slow_pic = self.slow_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
+
+		self.create_widget()
+
+		# setup command socket
+		context = zmq.Context()
+		self.command_socket = context.socket(zmq.REP)
+		self.command_socket.bind("tcp://" + str(server_address) + ':' + str(command_port))
+
+	def create_widget(self):
+		# main layout widget
+		layout = QVBoxLayout(self)
+
+		# robot status 'car count, sign position'
+		status_layout = QHBoxLayout()
+		status_layout.addWidget(QLabel(self.robot_name))
+		self.sign_pos_label = QLabel('')
+		self.sign_pos_label.setPixmap(self.stop_pic)
+		status_layout.addWidget(self.sign_pos_label)
+		label = QLabel('Cars passed: ', self)
+		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+		status_layout.addWidget(label)
+		self.car_count_label = QLabel('0', self)
+		self.car_count_reader = CarCountWorker(self.server_address, self.count_port, self.robot_name)
+		self.car_count_reader.start()
+		self.car_count_reader.sig.connect(self.on_updated_count)
+		status_layout.addWidget(self.car_count_label)
+		layout.addLayout(status_layout)
+
+		# emergency vehicle status layout
+		emergency_layout = QHBoxLayout()
+		self.emergency_desc_label = QLabel('Emergency vehicle approaching:')
+		emergency_layout.addWidget(self.emergency_desc_label)
+		self.emergency_ans_label = QLabel('None',self)
+		self.emergency_ans_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+		emergency_layout.addWidget(self.emergency_ans_label)
+		layout.addLayout(emergency_layout)
+		
+		# video feed
+		self.video_label = QLabel(self.robot_name + 'Video Feed Unavailable')
+		self.video_label.setMinimumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
+		self.video_label.setMaximumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
+		self.video_reader = FrameReaderWorker(self.server_address, self.video_port, self.video_frame_file)
+		self.video_reader.start()
+		self.video_reader.sig.connect(self.on_updated_frame)
+		layout.addWidget(self.video_label)
+
+		# slow/stop button
+		self.slow_stop_button = QPushButton(self.robot_name + ' Slow/Stop Button')
+		self.slow_stop_button.clicked.connect(self.switch_sign)
+		layout.addWidget(self.slow_stop_button)
+
+		# signboard messages
+		layout.addWidget(QLabel('Display Message'))
+		self.cbox = QComboBox()
+		self.cbox.addItem('Stop!')
+		self.cbox.addItem('Proceed Slowly')
+		self.cbox.addItem('Emergency vehicles only')
+		self.cbox.addItem('Stop! There is a problem, please be patient')
+		layout.addWidget(self.cbox)
+
+	def on_updated_count(self, car_count):
+		print('car count updated')
+		self.car_count_label.setText(str(self.car_count))
+
+	def on_updated_frame(self):
+		self.video_label.setPixmap(QPixmap(self.video_frame_file))
+
+	def on_emergency_approach(self):
+		#TODO just to test the function and change the color when emergency vehicle is approaching
+		#need to be adjusted
+		emergency_desc_label.setStyleSheet('color: red')
+		emergency_ans_label.setStyleSheet('color: red')
+		emergency_ans_label.setText("Aproaching")
+	
+	# tells the robot to switch its sign from slow or stop
+	def switch_sign(self):
+		if (self.sign_slow == False):
+			print ("Controller sent STOP signal")
+			#self.command_socket.recv()
+			#self.command_socket.send(b"6")
+			self.sign_slow = True
+		else:
+			print ("Controller sent SLOW signal")
+			#Logic for Resetting Car Count
+			#if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
+				#count_socket.recv()
+				#Sending Reset Command to Raspberry Pi
+				#count_socket.send(b"8")
+
+			#self.command_socket.recv()
+			#self.command_socket.send(b"5")
+			self.sign_slow = False
+			#count_socket.recv()
+			#count_socket.send(b"8")
+
+		#************************added*********************************
+		#need to specify when it is stop and slow
+		#robot 1
+		#if stop, change to slow
+		if self.slow_stop_button.isChecked():
+			self.slow_stop_button.setText("Robot1: Swap to SLOW")
+			self.slow_stop_button.setCheckable(False)
+			self.slow_stop_button.setStyleSheet("color: orange")
+
+			# changing graphic accordingly
+			self.sign_pos_label.setPixmap(self.slow_pic)
+
+			# setting display message
+			self.cbox.setCurrentIndex(0)
+
+		#if slow change to stop
+		else:
+			self.slow_stop_button.setText("Robot1: Swap to STOP")
+			self.slow_stop_button.setCheckable(True)
+			self.slow_stop_button.setStyleSheet("color: red")
+
+			# changing graphic accordingly
+			self.sign_pos_label.setPixmap(self.stop_pic)
+
+			#setting display message
+			self.cbox.setCurrentIndex(1)
+		
+
 # Main application GUI
 class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
-		self.set_slow_r1 = False
-		self.set_slow_r2 = False 
-		self.location_r1 = 'image_r1.jpg'
-		self.location_r2 = 'image_r2.jpg'
 
-		self.video_label_r1 = QLabel('Robot 1 Video Feed Unavailable', self)
-		self.video_label_r2 = QLabel('Robot 2 Video Feed Unavailable', self)
-		self.robot_label_r1 = QLabel("Robot 1",self)
-		self.robot_label_r2 = QLabel("Robot 2",self)
-		self.slow_stop_button_r1 = QPushButton('Robot1: Swap to SLOW', self)
-		self.slow_stop_button_r1.clicked.connect(self.handleButton_r1)
-		self.slow_stop_button_r2 = QPushButton('Robot: Swap to SLOW', self)
-		self.slow_stop_button_r2.clicked.connect(self.handleButton_r2)
+		r1 = RobotControl('Robot 1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot 2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
-		#Will be used for Resetting counter logic 
-		self.Robot1CarCount = 0
-		self.Robot2CarCount = 0
-		#*************************************added**************************************
-		#car counting message
-		self.robot_car_number_r1 = QLabel("Cars passed= ", self)
-		self.robot_car_number_r2 = QLabel("Cars passed= ", self)
-		self.car_number_r1 = QLabel("0",self)
-		self.car_number_r2 = QLabel("0",self)
-		#disolay menu bar
-		self.display_r1 = QLabel("Display message:", self)
-		self.display_r2 = QLabel("Display message:", self)
-		self.comboBox_r1 = QComboBox(self)
-		self.comboBox_r2 = QComboBox(self)
-		self.comboBox_r1.addItem("Stop!")
-		self.comboBox_r1.addItem("Proceed Slowly")
-		self.comboBox_r1.addItem("Emergency vehicles only")
-		self.comboBox_r1.addItem("Stop! There is a problem, please be patient")
-		self.comboBox_r2.addItem("Stop!")
-		self.comboBox_r2.addItem("Proceed Slowly")
-		self.comboBox_r2.addItem("Emergency vehicles only")
-		self.comboBox_r2.addItem("Stop! There is a problem, please be patient")
-		self.comboBox_r1.activated[str].connect(self.styleChoice)
-		self.comboBox_r2.activated[str].connect(self.styleChoice)
-		#emergency vehicle message
-		self.EmergencyApproach_r1 = QLabel("Emergency vehicle approaching?:", self)
-		self.EmergencyApproach_r2 = QLabel("Emergency vehicle approaching?:", self)
-		self.EmergencyThere_r1 = QLabel("No", self)
-		self.EmergencyThere_r2 = QLabel("No", self)
-		self.Emergency_vehicle()
-		#setting buttons to stop and setting the color to res
-		self.slow_stop_button_r1.setStyleSheet("color: orange")
-		self.slow_stop_button_r2.setStyleSheet("color: orange")
-		#to distinguish between stop and slow. (stop -> true, slow-> false)
-		self.slow_stop_button_r1.setCheckable(True)
-		self.slow_stop_button_r1.setCheckable(True)
-		#adding stop/slow graphics
-		self.Graphic_r1 = QLabel(self)
-		self.Graphic_r2 = QLabel(self)
-		self.pixmap_r1 = QPixmap('Stop.png')
-		self.Graphic_r1.setPixmap(self.pixmap_r1)
-		self.smaller_pixmap_r1 = self.pixmap_r1.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-		self.Graphic_r1.setPixmap(self.smaller_pixmap_r1)
-		self.pixmap_r2 = QPixmap('Stop.png')
-		self.Graphic_r2.setPixmap(self.pixmap_r2)
-		self.smaller_pixmap_r2 = self.pixmap_r2.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-		self.Graphic_r2.setPixmap(self.smaller_pixmap_r2)
-		# *******************************************************************************
+		layout = QHBoxLayout(self)
+		layout.addWidget(r1)
+		layout.addWidget(r2)
 
-		#SETTING POSITION
-		#horizontal,vertical, size_horizontal, size_vertical
-		self.robot_label_r1.setGeometry(10,10,480,30)
-		self.robot_label_r2.setGeometry(720,10,480,30)
-		self.video_label_r1.setGeometry(10,50,640,480)
-		self.video_label_r2.setGeometry(720,50,640,480)
-		self.slow_stop_button_r1.setGeometry(10,550,640,100)
-		self.slow_stop_button_r2.setGeometry(720,550,640,100)
-
-		# *************************************added**************************************
-		self.robot_car_number_r1.setGeometry(270, 10, 480, 30)
-		self.robot_car_number_r2.setGeometry(970, 10, 480, 30)
-		self.car_number_r1.setGeometry(440, 10, 480, 30)
-		self.car_number_r2.setGeometry(1150, 10, 480, 30)
-		self.display_r1.setGeometry(60, 625, 530, 50)
-		self.display_r2.setGeometry(770, 625, 530, 50)
-		self.comboBox_r1.setGeometry(60,650,530,50)
-		self.comboBox_r2.setGeometry(770,650,530,50)
-		self.EmergencyApproach_r1.setGeometry(10, 30, 400, 30)
-		self.EmergencyApproach_r2.setGeometry(720, 30, 400, 30)
-		self.EmergencyThere_r1.setGeometry(420, 30, 50, 30)
-		self.EmergencyThere_r2.setGeometry(1140, 30, 50, 30)
-		self.Graphic_r1.setGeometry(130, 10, 50, 30)
-		self.Graphic_r2.setGeometry(840, 10, 50, 30)
-		# *******************************************************************************
-
-		
-		self.video_reader_r1 = Thread(serverAddress, 8000, self.location_r1)  # Linda edit address
-		self.video_reader_r2 = Thread(serverAddress, 8001, self.location_r2)  # Linda edit address
-		self.video_reader_r1.start()
-		self.video_reader_r2.start()
-		self.video_reader_r1.sig.connect(self.on_change_r1)
-		self.video_reader_r2.sig.connect(self.on_change_r2)
-		self.car_count_r1 = CarCountThread1()
-		self.car_count_r1.start()
-		self.car_count_r2 = CarCountThread2()
-		self.car_count_r2.start()
-		self.car_count_r1.sig.connect(self.CarCounting_Robot1)
-		self.car_count_r2.sig.connect(self.CarCounting_Robot2)
-		
 		self.show()
 
-		#--------------------------------------------------------------------#
-		#Sending Character
-		
-		#--------------------------------------------------------------------#
-
-	
-
-	def on_change_r1(self):
-		self.video_label_r1.setPixmap(QPixmap(self.location_r1))
-
-	def on_change_r2(self):
-		self.video_label_r2.setPixmap(QPixmap(self.location_r2))
-
-	def handleButton_r1(self):
-		if (self.set_slow_r1 == False):
-			print ("Controller sent STOP signal")
-
-			#s.recv()
-			#s.send(b"6")
-			self.set_slow_r1 = True
-		else:
-			print ("Controller sent SLOW signal")
-			#Logic for Resetting Car Count
-			if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
-				s.recv()
-				#Sending Reset Command to Raspberry Pi
-				s.send(b"8")
-			#s.recv()
-			#s.send(b"5")
-			self.set_slow_r1 = False
-			#s.recv()
-			#s.send(b"8")
-		#************************added*********************************
-		#need to specify when it is stop and slow
-		#robot 1
-		#if stop, change to slow
-		if self.slow_stop_button_r1.isChecked():
-			self.slow_stop_button_r1.setText("Robot1: Swap to SLOW")
-			self.slow_stop_button_r1.setCheckable(False)
-			self.slow_stop_button_r1.setStyleSheet("color: orange")
-			# changing graphic accordingly
-			self.pixmap_r1 = QPixmap('Stop.png')
-			self.Graphic_r1.setPixmap(self.pixmap_r1)
-			self.smaller_pixmap_r1 = self.pixmap_r1.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r1.setPixmap(self.smaller_pixmap_r1)
-			# setting display message
-			self.comboBox_r1.setCurrentIndex(0)
-			self.styleChoice("Stop!")
-			
-		#if slow change to stop
-		else:
-			self.slow_stop_button_r1.setText("Robot1: Swap to STOP")
-			self.slow_stop_button_r1.setCheckable(True)
-			self.slow_stop_button_r1.setStyleSheet("color: red")
-			# changing graphic accordingly
-			self.pixmap_r1 = QPixmap('Slow.jpg')
-			self.Graphic_r1.setPixmap(self.pixmap_r1)
-			self.smaller_pixmap_r1 = self.pixmap_r1.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r1.setPixmap(self.smaller_pixmap_r1)
-			#setting display message
-			self.comboBox_r1.setCurrentIndex(1)
-			self.styleChoice("Proceed Slowly")
-
-	def handleButton_r2(self):
-		if (self.set_slow_r2 == False):
-			print ("Controller sent STOP signal")
-			print(self.Robot1CarCount)
-			#s.recv()
-			#s.send(b"6")
-			s.recv() #take out later
-			s.send(b"8") #take out later 
-			self.set_slow_r2 = True
-		else:
-			print ("Controller sent SLOW signal")
-			#Logic for Resetting Car Count
-			s.recv() #take out later
-			s.send(b"8") #take out later 
-			if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
-				s.recv()
-				#Sending Reset Command to Raspberry Pi
-				s.send(b"8")
-			#s.recv()
-			#s.send(b"5")
-			self.set_slow_r2 = False
-			#s.recv()
-			#s.send(b"8")
-		
-		# robot 2
-		# if stop, change to slow
-		if self.set_slow_r2 == False:
-			# Controller sent stop signal
-			self.slow_stop_button_r2.setText("Robot2: Swap to SLOW")
-			self.slow_stop_button_r2.setStyleSheet("color: orange")
-			# changing graphic accordingly
-			self.pixmap_r2 = QPixmap('Stop.png')
-			self.Graphic_r2.setPixmap(self.pixmap_r2)
-			self.smaller_pixmap_r2 = self.pixmap_r2.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r2.setPixmap(self.smaller_pixmap_r2)
-			# setting display message
-			self.comboBox_r2.setCurrentIndex(0)
-			self.styleChoice("Stop!")
-		# if slow change to stop
-		else:
-			# Controller sent slow signal
-			self.slow_stop_button_r2.setText("Robot2: Swap to STOP")
-			self.slow_stop_button_r2.setStyleSheet("color: red")
-			#changing graphic accordingly
-			self.pixmap_r2 = QPixmap('Slow.jpg')
-			self.Graphic_r2.setPixmap(self.pixmap_r2)
-			self.smaller_pixmap_r2 = self.pixmap_r2.scaled(50, 50, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-			self.Graphic_r2.setPixmap(self.smaller_pixmap_r2)
-			# setting display message
-			self.comboBox_r2.setCurrentIndex(1)
-			self.styleChoice("Proceed Slowly")
-		#*************************************************************
-
-
-		#commented these to change the colors since I didn't have the clients
-		#response = s.recv()
-		#print(response)
-		#s.send(data.encode('utf-8'))
-		#print("Sent the character")
-
-
-
-
-
-	# *************************************added**************************************
-	def CarCounting_Robot1(self, value):
-		#not sure if the number of you are reading from sensors is string or integer
-		#But assuming it is integer, however, the function needs to be adjusted according to the way
-		#data are read
-		#this is just for testing the function
-		#carNumber1 = 1
-		#carNumber2 = 1
-		self.car_number_r1.setText(str(value))
-		self.Robot1CarCount = value
-		#self.Robot1CarCount = value
-		
-		
-		#self.car_number_r2.setText(str(carNumber2))
-
-	def CarCounting_Robot2(self, value):
-		self.car_number_r2.setText(str(value))
-		self.Robot2CarCount = value
-
-	def styleChoice(self, text):
-		#need to distinguish between robot 1 or 2 -> not yet
-		print(text)
-
-	def Emergency_vehicle(self):
-		#just to test the function and change the color when emergency vehicle is approaching
-		#need to be adjusted
-		self.EmergencyApproach_r1.setStyleSheet('color: red')
-		self.EmergencyThere_r1.setText("Yes")
-		self.EmergencyThere_r1.setStyleSheet('color: red')
-
-
-# *******************************************************************************
-
-
+#Main 
 if __name__ == '__main__':
-
 	app = QApplication(sys.argv)
 	window = MainWindow()
-	window.setFixedSize(1400,800)
 	sys.exit(app.exec_())
