@@ -11,18 +11,18 @@ import zmq
 import time
 
 # CONSTANTS
-VIDEO_WIDTH	= 640
-VIDEO_HEIGHT	= 480
+VIDEO_WIDTH		= 640
+VIDEO_HEIGHT		= 480
 
-R1_VIDEO_PORT	= 8000
-R1_COMMAND_PORT	= 8001
-R1_COUNT_PORT	= 8002
+R1_VIDEO_PORT		= 8000
+R1_COMMAND_PORT		= 8001
+R1_COUNT_PORT		= 8002
 
-R2_VIDEO_PORT	= 8003
-R2_COMMAND_PORT	= 8004
-R2_COUNT_PORT	= 8005
+R2_VIDEO_PORT		= 8003
+R2_COMMAND_PORT		= 8004
+R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS = "192.168.0.188"
+SERVER_ADDRESS		= "192.168.0.188"
 
 # The CarCountWorker is a thread that updates the cars passed label of the robot with the
 # current number of cars that have travelled passed the robot
