@@ -10,6 +10,7 @@ import io
 import zmq
 import time
 import queue
+import robotcommands
 
 # CONSTANTS
 VIDEO_WIDTH		= 640
@@ -23,58 +24,51 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "192.168.0.188"
+SERVER_ADDRESS		= "127.0.0.1"
+
+# ROBOT		
+		
 
 # Replaces the CarCountWorker and 
 class RobotCommandWorker(QThread):
-	SET_SLOW_CONFIG_COMMAND = '1'
-	SET_STOP_CONFIG_COMMAND = '2'
-	REQ_CAR_COUNT = '3'
-	ZERO_CAR_COUNT = '4'
-	SHUTDOWN = '5'
-	# other commands
-	
 	sig = pyqtSignal(str)
 	command_queue = queue.Queue()  # need some kind of queue. can this one work? https://docs.python.org/3/library/queue.html
 	
 	def __init__(self, address, port, robot_name, parent=None):
+		super(QThread, self).__init__()
 		self.car_count = 0
+		self.robot_name = robot_name
 		
-		# setup zmq network connection
+		# setup command socket
+		context = zmq.Context()
+		self.command_socket = context.socket(zmq.REP)
+		self.command_socket.bind("tcp://" + str(address) + ':' + str(port))
 		
 	# when the robot needs to perform a command. add that command to the queue
 	def add_command(self, command):
-		# push a command onto the command queue
-		# must use locks
-		
-	def get_car_count(self):
-		# must use locks on
+		print("RobotCommandWorker " + self.robot_name + " added command: " + command)
+		self.command_queue.put(command)
+		print(self.command_queue.qsize())
 				
 	def run(self):
 		print(self.robot_name + ' RobotCommandWorker started')
 		try:
+			self.command_socket.recv().decode('utf-8') 
 			self.running = True
 			while self.running:
-				# we are prioritizing the robot's movements rather
-				# if there is a command in the commond queue
-					# pop a command from the command queue
-					# disable the slow/stop button on the gui so the user can't keep pressing it
-					# send command to the robot over the network
-					# wait for robot's response
-					# send a signal to qt gui to update the slow/stop pic
-				# else when there is no command in the queue
-					# ask the robot for car count information
-					# wait for robots' response
-					# store that information in this class
-					# send a signal to qt gui to update the car count
+				
+				if self.command_queue.qsize() > 0:
+					command = self.command_queue.get()
+					print("RobotCommandWorker " + self.robot_name + " command sent: " + command)
+					self.command_socket.send_string(command)
+					message = self.command_socket.recv().decode('utf-8')
+					print("RobotCommandWorker " + self.robot_name + " message received: " + message)
+				
+				time.sleep(0.5)
 					
-				# if there are more commands don't delay processing them
-				# if we just got a car count delay and there are no commands 
-				# delay some short amount of time
 		finally:
 			print(self.robot_name + 'RobotCommandWorker done')
-		
-		
+
 # The CarCountWorker is a thread that updates the cars passed label of the robot with the
 # current number of cars that have travelled passed the robot
 class CarCountWorker(QThread):
@@ -93,14 +87,14 @@ class CarCountWorker(QThread):
 			self.running = True
 			while self.running:
 				car_count = self.socket.recv().decode('utf-8')
-
+				print(car_count)
 				#Colin needs to send empty string when he starts the program
 				#So this is to ignore that empty string 
-				if car_count != '':
-					self.sig.emit(car_count)
+				#if car_count != '':
+				self.sig.emit(car_count)
 					
 				time.sleep(0.5)
-				s3.send(b"7")
+				self.socket.send(b"7")
 
 		finally:
 			print(self.robot_name + 'Car Thread done')
@@ -151,7 +145,6 @@ class RobotControl(QWidget):
 		self.video_port = video_port
 		self.command_port = command_port
 		self.count_port = count_port
-		self.car_count = 0
 		self.emergency_vehicle = True
 		self.sign_slow = False
 		self.video_frame_file = robot_name + '_video.png'
@@ -163,13 +156,7 @@ class RobotControl(QWidget):
 		self.slow_pic = QPixmap('Slow.jpg')
 		# TODO resize pic so we don't need to scale it
 		self.slow_pic = self.slow_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
-
 		self.create_widget()
-
-		# setup command socket
-		context = zmq.Context()
-		self.command_socket = context.socket(zmq.REP)
-		self.command_socket.bind("tcp://" + str(server_address) + ':' + str(command_port))
 
 	def create_widget(self):
 		# main layout widget
@@ -184,7 +171,7 @@ class RobotControl(QWidget):
 		label = QLabel('Cars passed: ', self)
 		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 		status_layout.addWidget(label)
-		self.car_count_label = QLabel('0', self)
+		self.car_count_label = QLabel('0')
 		self.car_count_reader = CarCountWorker(self.server_address, self.count_port, self.robot_name)
 		self.car_count_reader.start()
 		self.car_count_reader.sig.connect(self.on_updated_count)
@@ -199,7 +186,7 @@ class RobotControl(QWidget):
 		self.emergency_ans_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 		emergency_layout.addWidget(self.emergency_ans_label)
 		layout.addLayout(emergency_layout)
-		
+
 		# video feed
 		self.video_label = QLabel(self.robot_name + 'Video Feed Unavailable')
 		self.video_label.setMinimumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
@@ -212,6 +199,8 @@ class RobotControl(QWidget):
 		# slow/stop button
 		self.slow_stop_button = QPushButton(self.robot_name + ' Slow/Stop Button')
 		self.slow_stop_button.clicked.connect(self.switch_sign)
+		self.robot_command_worker =	RobotCommandWorker(self.server_address, self.command_port, self.robot_name)
+		self.robot_command_worker.start()
 		layout.addWidget(self.slow_stop_button)
 
 		# signboard messages
@@ -225,7 +214,7 @@ class RobotControl(QWidget):
 
 	def on_updated_count(self, car_count):
 		print('car count updated')
-		self.car_count_label.setText(str(self.car_count))
+		self.car_count_label.setText(str(car_count))
 
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
@@ -239,51 +228,24 @@ class RobotControl(QWidget):
 	
 	# tells the robot to switch its sign from slow or stop
 	def switch_sign(self):
-		if (self.sign_slow == False):
+		if (self.sign_slow == True):
 			print ("Controller sent STOP signal")
-			#self.command_socket.recv()
-			#self.command_socket.send(b"6")
-			self.sign_slow = True
+			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_STOP)
+			self.slow_stop_button.setText("Robot1: Swap to SLOW")
+			self.slow_stop_button.setStyleSheet("color: orange")
+			self.sign_pos_label.setPixmap(self.stop_pic)
+			self.cbox.setCurrentIndex(0)
+			self.sign_slow = False
 		else:
 			print ("Controller sent SLOW signal")
-			#Logic for Resetting Car Count
-			#if (self.Robot1CarCount == self.Robot2CarCount and self.set_slow_r1 == False and self.set_slow_r2 == False):
-				#count_socket.recv()
-				#Sending Reset Command to Raspberry Pi
-				#count_socket.send(b"8")
-
-			#self.command_socket.recv()
-			#self.command_socket.send(b"5")
-			self.sign_slow = False
-			#count_socket.recv()
-			#count_socket.send(b"8")
-
-		#************************added*********************************
-		#need to specify when it is stop and slow
-		#robot 1
-		#if stop, change to slow
-		if self.slow_stop_button.isChecked():
-			self.slow_stop_button.setText("Robot1: Swap to SLOW")
-			self.slow_stop_button.setCheckable(False)
-			self.slow_stop_button.setStyleSheet("color: orange")
-
-			# changing graphic accordingly
-			self.sign_pos_label.setPixmap(self.slow_pic)
-
-			# setting display message
-			self.cbox.setCurrentIndex(0)
-
-		#if slow change to stop
-		else:
+			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_SLOW)
+			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_RESET_COUNT)
 			self.slow_stop_button.setText("Robot1: Swap to STOP")
 			self.slow_stop_button.setCheckable(True)
 			self.slow_stop_button.setStyleSheet("color: red")
-
-			# changing graphic accordingly
-			self.sign_pos_label.setPixmap(self.stop_pic)
-
-			#setting display message
+			self.sign_pos_label.setPixmap(self.slow_pic)
 			self.cbox.setCurrentIndex(1)
+			self.sign_slow = True
 		
 
 # Main application GUI
@@ -291,9 +253,6 @@ class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
-		
-		# TODO (low priority) instead of hardcoding the SEVER_ADDRESS, R1_VIDEO_PORT, etc constants into the program, lets 
-		# read them from a config file
 
 		r1 = RobotControl('Robot 1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
 		r2 = RobotControl('Robot 2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
