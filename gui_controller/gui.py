@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "127.0.0.1"
+#SERVER_ADDRESS		= "127.0.0.1"
 
 # ROBOT		
 		
@@ -64,7 +64,7 @@ class RobotCommandWorker(QThread):
 					message = self.command_socket.recv().decode('utf-8')
 					print("RobotCommandWorker " + self.robot_name + " message received: " + message)
 				
-				time.sleep(0.5)
+				time.sleep(0.1)
 					
 		finally:
 			print(self.robot_name + 'RobotCommandWorker done')
@@ -254,8 +254,16 @@ class MainWindow(QWidget):
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)
 
-		r1 = RobotControl('Robot 1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot 2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		addr = ''	
+		try:
+			addr = socket.gethostbyname(socket.gethostname())
+			print("The controller's ip address is: " + addr)
+		except socket.gaierror:
+			print("there was an error resolving the host")
+			sys.exit()		
+
+		r1 = RobotControl('Robot 1', addr, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot 2', addr, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
