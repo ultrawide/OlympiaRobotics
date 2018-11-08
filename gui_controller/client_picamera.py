@@ -2,7 +2,7 @@ import io
 import socket
 import struct
 import time
-#import picamera
+import picamera
 from threading import Thread
 import zmq
 import sys
@@ -10,9 +10,9 @@ import configparser
 import robotcommands
 
 #robot library
-#import Adafruit_PCA9685
-#import smbus #for i2c			# must enabled for SMBUS
-#import pigpio
+import Adafruit_PCA9685
+import smbus #for i2c			# must enabled for SMBUS
+import pigpio
 
 # CONSTANTS
 CONFIG_FILENAME = 'config.txt'  # configuration file name
@@ -22,7 +22,7 @@ VIDEO_HEIGHT	= 480
 SMBUS_CONTROLLER = 1			# i2c bus controller
 ARDUINO_I2C_ADDRESS = 0x04		# address of the arduino on the i2c bus
 
-SERVER = "127.0.0.1"			# ip address of the controller
+SERVER = "207.23.164.170"			# ip address of the controller
 
 #add more commands here
 
@@ -250,7 +250,7 @@ if __name__ == "__main__":
 		print("Established pipe for video stream")
 
 		# pass the required socket to the thread in an argument
-		video_thread = Thread(target = sendVideo, kwargs=dict(sockt=client_socket))
+		video_thread = Thread(target = send_video, kwargs=dict(socket=video_socket))
 		video_thread.start()
 		print("Started video streaming thread")
 	else:
