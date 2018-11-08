@@ -104,9 +104,9 @@ class CarCountWorker(QThread):
 class FrameReaderWorker(QThread):
 	sig = pyqtSignal()
 
-	def __init__(self, address, port, robot_name):
+	def __init__(self, address, port, video_frame_file):
 		super(QThread, self).__init__()
-		self.image_loc =  robot_name + '_video.jpg'
+		self.image_loc =  video_frame_file
 		self.server_socket = socket.socket()
 		self.server_socket.bind((address,port))
 		self.server_socket.listen(0)
