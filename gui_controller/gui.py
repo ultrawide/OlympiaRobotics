@@ -252,15 +252,7 @@ class RobotControl(QWidget):
 class MainWindow(QWidget):
 
 	def __init__(self, *args, **kwargs):
-		QWidget.__init__(self, *args, **kwargs)
-
-		addr = ''	
-		try:
-			addr = socket.gethostbyname(socket.gethostname())
-			print("The controller's ip address is: " + addr)
-		except socket.gaierror:
-			print("there was an error resolving the host")
-			sys.exit()		
+		QWidget.__init__(self, *args, **kwargs)	
 
 		r1 = RobotControl('Robot 1', addr, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
 		r2 = RobotControl('Robot 2', addr, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
