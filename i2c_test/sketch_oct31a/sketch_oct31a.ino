@@ -22,6 +22,8 @@ int LEDPIN = 3;
 IRrecv irrecv(RECVPIN);
 decode_results results;
 
+
+
 void setup() {
   Serial.begin(9600); // start serial for output
   // initialize i2c as slave
@@ -44,7 +46,7 @@ void setup() {
 }
 
 void loop() {
-  IR_Detector();
+  //IR_Detector();
   //Car_Count();
   delay(1000);
 }
