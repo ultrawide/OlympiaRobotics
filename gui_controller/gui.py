@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-#SERVER_ADDRESS		= "127.0.0.1"
+SERVER_ADDRESS		= "127.0.0.1"
 
 # ROBOT		
 		
@@ -104,9 +104,9 @@ class CarCountWorker(QThread):
 class FrameReaderWorker(QThread):
 	sig = pyqtSignal()
 
-	def __init__(self, address, port, location):
+	def __init__(self, address, port, robot_name):
 		super(QThread, self).__init__()
-		self.image_loc = location
+		self.image_loc = robot_name + '_video.png'
 		self.server_socket = socket.socket()
 		self.server_socket.bind((address,port))
 		self.server_socket.listen(0)
