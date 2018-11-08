@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "127.0.0.1"
+SERVER_ADDRESS		= "207.23.164.170"
 
 # ROBOT		
 		
@@ -106,7 +106,7 @@ class FrameReaderWorker(QThread):
 
 	def __init__(self, address, port, robot_name):
 		super(QThread, self).__init__()
-		self.image_loc = robot_name + '_video.png'
+		self.image_loc =  robot_name + '_video.jpg'
 		self.server_socket = socket.socket()
 		self.server_socket.bind((address,port))
 		self.server_socket.listen(0)
@@ -147,7 +147,7 @@ class RobotControl(QWidget):
 		self.count_port = count_port
 		self.emergency_vehicle = True
 		self.sign_slow = False
-		self.video_frame_file = robot_name + '_video.png'
+		self.video_frame_file = robot_name + '_video.jpg'
 
 		# load graphics for sign_pos_label
 		self.stop_pic = QPixmap('Stop.png')
@@ -218,7 +218,6 @@ class RobotControl(QWidget):
 
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
-
 	def on_emergency_approach(self):
 		#TODO just to test the function and change the color when emergency vehicle is approaching
 		           #need to be adjusted
@@ -254,8 +253,8 @@ class MainWindow(QWidget):
 	def __init__(self, *args, **kwargs):
 		QWidget.__init__(self, *args, **kwargs)	
 
-		r1 = RobotControl('Robot 1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot 2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		r1 = RobotControl('Robot1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
