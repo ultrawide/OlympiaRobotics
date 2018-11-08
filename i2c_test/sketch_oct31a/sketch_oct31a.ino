@@ -1,7 +1,23 @@
-#include <IRremote.h> // Refer to readme.txt to install this library
+// Refer to readme.txt to install library depedencies
+
+#include <gamma.h>
+#include <RGBmatrixPanel.h>
+#include <IRremote.h> 
 #include <Wire.h>
 
+// I2C 
 #define SLAVE_ADDRESS 0x04
+
+// LED DISPLAY
+#define CLK 11 // USE THIS ON ARDUINO MEGA
+#define OE   9
+#define LAT 10
+#define A   A0
+#define B   A1
+#define C   A2
+#define D   A3
+
+RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 
 // Car Counting US Sensor PINS
 int ECHOPIN = 7;
@@ -22,8 +38,6 @@ int LEDPIN = 3;
 IRrecv irrecv(RECVPIN);
 decode_results results;
 
-
-
 void setup() {
   Serial.begin(9600); // start serial for output
   // initialize i2c as slave
@@ -43,11 +57,22 @@ void setup() {
   /// IR SENSOR SETUP ///
   irrecv.enableIRIn(); // Start the receiver
   Serial.println("Enabled IRin");
+
+  /// LED DISPLAY ///
+  matrix.begin();
+  matrix.fillScreen(matrix.Color333(0, 0, 0));
+
+  // draw some text!
+  matrix.setTextSize(2);     // size 1 == 8 pixels high
+  matrix.setTextWrap(true); 
+
+  matrix.setCursor(8, 0); // start at top left, with 8 pixel of spacing
 }
 
 void loop() {
-  //IR_Detector();
-  //Car_Count();
+  LED_Display();
+  IR_Detector();
+  Car_Count();
   delay(1000);
 }
 
@@ -114,3 +139,60 @@ void IR_Detector()
     irrecv.resume();
   }
 }
+
+void LED_Display() {
+  if (Serial.available())
+  {
+    char c = Serial.read();     // Read data into c
+    String str;
+    switch (c)
+    {
+      case 'S':
+        matrix.setTextSize(2); 
+        matrix.fillScreen(matrix.Color333(0, 0, 0));
+        matrix.setCursor(4, 8);
+        matrix.setTextColor(matrix.Color333(7,0,0));
+        matrix.print("Stop!");
+        break;
+      case 'P':
+        matrix.setTextSize(1); 
+        matrix.fillScreen(matrix.Color333(0, 0, 0));
+        matrix.setCursor(6, 6);
+        matrix.setTextColor(matrix.Color333(7,1,0));
+        matrix.print("Proceed");
+        matrix.setCursor(20, 16);
+        matrix.print("Slowly");
+        break;
+      case 'E':
+        matrix.setTextSize(1); 
+        matrix.fillScreen(matrix.Color333(0, 0, 0));
+        matrix.setCursor(5, 3);
+        matrix.setTextColor(matrix.Color333(7,7,0));
+        matrix.print("Emergency");
+        matrix.setCursor(9, 13);
+        matrix.print("Vehicles");
+        matrix.setCursor(19, 22);
+        matrix.print("Only");
+        break;
+      case 'M':
+        matrix.setTextSize(1); 
+        matrix.fillScreen(matrix.Color333(0, 0, 0));
+        matrix.setCursor(2, 0);
+        matrix.setTextColor(matrix.Color333(7,0,0));
+        matrix.print("Stop!");
+        //matrix.setCursor(0, 9);
+        matrix.setTextColor(matrix.Color333(7,7,0));
+        matrix.print("There");
+        matrix.setCursor(0, 8);
+        matrix.print("is");
+        matrix.setCursor(14, 8);
+        matrix.print("a");
+        matrix.setCursor(22, 8);
+        matrix.print("problem");
+        matrix.setCursor(5, 16);
+        matrix.print("please be");
+        matrix.setCursor(12, 24);
+        matrix.print("patient");
+        break;
+    }
+}}
