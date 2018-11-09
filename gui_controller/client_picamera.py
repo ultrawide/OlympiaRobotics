@@ -203,14 +203,20 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 	except SystemExit:
 		os._exit(0)
 
-# FRANK
-# Sending status of robot to controller (carcount, emerg)
+# This function sends the status of the robot's carcount and emergency vehicle status to the robot
+# at a regular intervals.  Both carcount and emergency vehicle status are retrived from the arduino
+# using I2C.  The Arduino should set a variable to True when there is an emergency vehicle approaching
+# it should stay True until the controller resets it to False.
+# - current car count (number)
+# - IR emergency vehicle sensor status. should be True if there is an emergency vehicle approaching
+#   or False if there isn't an emergency vehcile approaching
+# - IR emergency vehicle sensor status stays True until the controller resets the status
 def publish_robot_status(socket2, i2c_enabled, bus):
 	try:
 		while True:
 			socket2.send(''.encode('utf-8'))
 			message = socket2.recv()
-			if message == "7": #get car count
+			if message == "7":
 				print("Retrieving car count from arduino")
 				writeNumber(bus,ARDUINO_I2C_ADDRESS, 1)
 				time.sleep(0.05)
@@ -272,13 +278,19 @@ if __name__ == "__main__":
 		print("Receiving Commands Disabled")
 
 	# FRANK
+	# (1) change the network model from request reply to publish subscribe
+	# the robot is the publisher while the controller is the subscriber
+	# The CarCountWorker in gui.py receives the status information from the robot
+	# It should be able to work with any changes you make here to the sockets
+	# (2) please give socket2 a better name
+	# (3) fix publish_robot_status function so that it works with the pub sub network model
+	# (4) fix CarCountWorker in gui.py so it works with the publish subscribe model.
+	# (5) the interval for status updates should be .5 seconds
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
 		socket2 = context.socket(zmq.REQ)
 		socket2.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
-		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=socket2,
-																					i2c_enabled=i2c_enabled,
-																					bus=bus))
+		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=socket2,																	bus=bus))
 		publish_status_thread.start()
 	else:
 		print("Sending Robot Status Updates Disabled")
