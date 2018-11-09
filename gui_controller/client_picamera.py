@@ -157,9 +157,9 @@ def send_video(socket):
 #
 # LINDA
 # (1) add signboard commands to this function ( if you like, you can add a command for each different signboard message)
-# (3) Add a command to reset the Arduino's emergency vehicle approaching to False (similar to how car count is done
+# (3) Add a command to reset the Arduino's emergency vehicle approaching to False (similar to how car count is reset
 #	you can get Colin's help if you to adjust the aruino code
-# (4) update the RobotCommandWorker in gui.py to work with this function
+# (4) update the RobotCommandWorker in gui.py so that it sends the correct commands over the network
 # (5) use constants for the robot commands instead of hard coding them 
 #	example: if command == robotcommands.CMD_ROBOT_STOP: 
 #	instead of : if command = '1':
