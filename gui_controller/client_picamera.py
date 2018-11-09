@@ -146,8 +146,26 @@ def send_video(socket):
 		socket.close()
         
 
-# processes the commands from the controller
-# socket: the network socket used to communicate with the
+# The process_command function receives commands from the controller
+# and tells the robot to perform each action.  When each action is completed
+# it sends a message describing what action was done back to the controller.
+# socket is the network socket use to communicate with the controller
+# pwm_enabled True enables the motors, Falase allows the motors to be disabled if necessary (for testing)
+# i2c_enabled True enables I2c bus, flase allow the i2c to be turned off for testing without i2c.
+#	only messages are sent to robot
+# bus is the i2c bus controller on the pi used to communicate with the arduinos
+#
+# LINDA
+# (1) add signboard commands to this function ( if you like, you can add a command for each different signboard message)
+# (3) Add a command to reset the Arduino's emergency vehicle approaching to False (similar to how car count is done
+#	you can get Colin's help if you to adjust the aruino code
+# (4) update the RobotCommandWorker in gui.py to work with this function
+# (5) use constants for the robot commands instead of hard coding them 
+#	example: if command == robotcommands.CMD_ROBOT_STOP: 
+#	instead of : if command = '1':
+# (6) any new robot commands should be added to the robotcommands.py example
+#	example: CMD_SIGNBOARD_STOP = '55'
+# (7) Fix RobotCOmmandWorker in gui.py so that its run command has a shorter delay < 0.5 seconds
 def process_command(socket, pwm_enabled, i2c_enabled, bus):
 
 	if pwm_enabled:
