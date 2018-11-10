@@ -29,7 +29,7 @@ SERVER_ADDRESS		= "207.23.164.170"
 # ROBOT		
 		
 
-# Replaces the CarCountWorker and 
+# Sends commands to the robot
 class RobotCommandWorker(QThread):
 	sig = pyqtSignal(str)
 	command_queue = queue.Queue()  # need some kind of queue. can this one work? https://docs.python.org/3/library/queue.html
@@ -69,33 +69,29 @@ class RobotCommandWorker(QThread):
 		finally:
 			print(self.robot_name + 'RobotCommandWorker done')
 
-# The CarCountWorker is a thread that updates the cars passed label of the robot with the
-# current number of cars that have travelled passed the robot
-class CarCountWorker(QThread):
+# The RobotStatusWorker is a thread that updates the cars passed label of the robot with the
+# current number of cars that have travelled passed the robot.  It also gets the emergency
+# vehicle approaching flag from the robot.
+class RobotStatusWorker(QThread):
 	sig = pyqtSignal(str)
 
 	def __init__(self, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
 		self.robot_name = robot_name
 		context = zmq.Context()
-		self.socket = context.socket(zmq.REP)
-		self.socket.bind("tcp://" + str(address) + ":" + str(port))
+		self.subscriber = context.socket(zmq.SUB)
+		self.subscriber.bind("tcp://" + str(address) + ":" + str(port))
+		self.subscriber.setsockopt(zmq.SUBSCRIBE, self.robot_name.encode('utf-8')) #subscribes to a specific robot
 	
 	def run(self):
 		print(self.robot_name + ' Car Counting Thread Started')
 		try:
 			self.running = True
 			while self.running:
-				car_count = self.socket.recv().decode('utf-8')
-				print(car_count)
-				#Colin needs to send empty string when he starts the program
-				#So this is to ignore that empty string 
-				#if car_count != '':
-				self.sig.emit(car_count)
-					
+				[robot_publisher,car_count] = self.subscriber.recv_multipart().decode('utf-8')
+				print("Recieved %s cars from Robot %s" % robot_publisher,car_count)
+				self.sig.emit(car_count)				
 				time.sleep(0.5)
-				self.socket.send(b"7")
-
 		finally:
 			print(self.robot_name + 'Car Thread done')
 
@@ -172,7 +168,7 @@ class RobotControl(QWidget):
 		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 		status_layout.addWidget(label)
 		self.car_count_label = QLabel('0')
-		self.car_count_reader = CarCountWorker(self.server_address, self.count_port, self.robot_name)
+		self.car_count_reader = RobotStatusWorker(self.server_address, self.count_port, self.robot_name)
 		self.car_count_reader.start()
 		self.car_count_reader.sig.connect(self.on_updated_count)
 		status_layout.addWidget(self.car_count_label)
