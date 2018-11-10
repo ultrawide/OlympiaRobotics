@@ -207,6 +207,7 @@ class RobotControl(QWidget):
 		self.cbox.addItem('Emergency vehicles only')
 		self.cbox.addItem('Stop! There is a problem, please be patient')
 		layout.addWidget(self.cbox)
+		self.cbox.activated.connect(self.switch_signboard)
 
 	def on_updated_count(self, car_count):
 		print('car count updated')
@@ -226,6 +227,7 @@ class RobotControl(QWidget):
 		if (self.sign_slow == True):
 			print ("Controller sent STOP signal")
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_STOP)
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_STOP)
 			self.slow_stop_button.setText("Robot1: Swap to SLOW")
 			self.slow_stop_button.setStyleSheet("color: orange")
 			self.sign_pos_label.setPixmap(self.stop_pic)
@@ -235,12 +237,29 @@ class RobotControl(QWidget):
 			print ("Controller sent SLOW signal")
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_SLOW)
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_RESET_COUNT)
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_PROCEED)
 			self.slow_stop_button.setText("Robot1: Swap to STOP")
 			self.slow_stop_button.setCheckable(True)
 			self.slow_stop_button.setStyleSheet("color: red")
 			self.sign_pos_label.setPixmap(self.slow_pic)
 			self.cbox.setCurrentIndex(1)
 			self.sign_slow = True
+			
+	def switch_signboard(self,index):
+		if (index == 0):
+			print ("Signboard will display STOP")
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_STOP)
+		elif (index == 1):
+			print ("Signboard will display Proceed")
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_PROCEED)
+		elif (index == 2):
+			print ("Signboard will display Emergency Vehicles only")
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_EMERGENCY)
+		elif (index == 3):
+			print ("Signboard will display A Problem Has Occured")
+			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_PROBLEM)
+		else:
+			print ("Received unknown signboard command")
 		
 
 # Main application GUI
