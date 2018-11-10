@@ -167,7 +167,7 @@ def send_video(socket):
 #	example: CMD_SIGNBOARD_STOP = '55'
 # (7) Fix RobotCOmmandWorker in gui.py so that its run command has a shorter delay < 0.5 seconds
 def process_command(socket, pwm_enabled, i2c_enabled, bus):
-
+	
 	if pwm_enabled:
 		print(robot_name + " motors are enabled")
 	else:
@@ -205,10 +205,54 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, 2)
 					time.sleep(0.05)
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					print("Count is : " + count)
 				else:
 					print("i2c disabled")
 				socket.send_string("Car count reset to zero")
+			elif command == robotcommands.CMD_DISPLAY_STOP: #Display Stop Sign on LED
+				print("Displaying Stop Sign on Arduino")
+				if i2c_enabled:
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_STOP))
+					time.sleep(0.05)
+					#Arduino needs to send the same number back to confirm that it processed correctly
+					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
+				else:
+					print("i2c disabled")
+				socket.send_string("RoboFlagger LED displaying 'STOP'")
+			elif command == robotcommands.CMD_DISPLAY_EMERGENCY: #Display Emergency Sign on LED
+				print("Displaying Emergency Sign on Arduino")
+				if i2c_enabled:
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_EMERGENCY))
+					time.sleep(0.05)
+					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
+				else:
+					print("i2c disabled")
+				socket.send_string("RoboFlagger LED displaying 'EMERGENCY'")
+			elif command == robotcommands.CMD_DISPLAY_PROBLEM: #Display Problem Sign on LED
+				print("Displaying Problem Sign on Arduino")
+				if i2c_enabled:
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROBLEM))
+					time.sleep(0.05)
+					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
+				else:
+					print("i2c disabled")
+				socket.send_string("RoboFlagger LED displaying 'PROBLEM'")	
+			elif command == robotcommands.CMD_DISPLAY_PROCEED: #Display Proceed Sign on LED
+				print("Displaying Proceed Sign on Arduino")
+				if i2c_enabled:
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
+					time.sleep(0.05)
+				else:
+					print("i2c disabled")
+				socket.send_string("RoboFlagger LED displaying 'PROCEED'")
+			elif command == robotcommands.CMD_RESET_EMERGENCY: #Display Reset Emergency 
+				print("Displaying Reset Emergency")
+				if i2c_enabled:
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
+					time.sleep(0.05)
+					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
+				else:
+					print("i2c disabled")
+				socket.send_string("RoboFlagger Reseting Emergency")
 			else:
 				print("command not supported")
 				socket.send_string("Command not supported")
@@ -221,6 +265,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 	except SystemExit:
 		os._exit(0)
 
+
 # This function sends the status of the robot's carcount and emergency vehicle status to the robot
 # at a regular intervals.  Both carcount and emergency vehicle status are retrived from the arduino
 # using I2C.  The Arduino should set a variable to True when there is an emergency vehicle approaching
@@ -229,24 +274,22 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 # - IR emergency vehicle sensor status. should be True if there is an emergency vehicle approaching
 #   or False if there isn't an emergency vehcile approaching
 # - IR emergency vehicle sensor status stays True until the controller resets the status
-def publish_robot_status(socket2, i2c_enabled, bus):
+def publish_robot_status(publisher, i2c_enabled, bus):
 	try:
 		while True:
-			socket2.send(''.encode('utf-8'))
-			message = socket2.recv()
-			if message == "7":
-				print("Retrieving car count from arduino")
-				writeNumber(bus,ARDUINO_I2C_ADDRESS, 1)
-				time.sleep(0.05)
-				carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
-				print("From Arduino, I received car count: ", carCount)
-				socket2.send(str(carCount).encode('utf-8'))
-				message = socket2.recv()
+			print("Publishing car count from arduino")
+			writeNumber(bus,ARDUINO_I2C_ADDRESS, 1)
+			time.sleep(0.05)
+			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
+			print("From Arduino, I received car count: ", carCount)
+			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8')])
+			time.sleep(0.5)
+			print("Published car count to %s" % robot_name)
 
 	except KeyboardInterrupt:
 		print("process command interrupted")
 	try:
-		socket2.close()
+		publisher.close()
 		sys.exit(0)
 	except SystemExit:
 		os._exit(0)
@@ -287,9 +330,9 @@ if __name__ == "__main__":
 		command_socket.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
 		print(robot_name + " : Established pipe for receiving commands")
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
-																	pwm_enabled=pwm_enabled, 
-																	i2c_enabled=i2c_enabled, 
-																	bus=bus))
+											pwm_enabled=pwm_enabled, 
+											i2c_enabled=i2c_enabled, 
+											bus=bus))
 		command_thread.start()
 		print(robot_name + " : Started command processing thread")
 	else:
@@ -300,15 +343,17 @@ if __name__ == "__main__":
 	# the robot is the publisher while the controller is the subscriber
 	# The CarCountWorker in gui.py receives the status information from the robot
 	# It should be able to work with any changes you make here to the sockets
-	# (2) please give socket2 a better name
+	# (2) please give publisher a better name
 	# (3) fix publish_robot_status function so that it works with the pub sub network model
 	# (4) fix CarCountWorker in gui.py so it works with the publish subscribe model.
 	# (5) the interval for status updates should be .5 seconds
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
-		socket2 = context.socket(zmq.REQ)
-		socket2.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
-		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=socket2,																	bus=bus))
+		publisher = context.socket(zmq.PUB)
+		publisher.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
+		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,
+											  i2c_enabled=i2c_enabled,
+											  bus=bus))
 		publish_status_thread.start()
 	else:
 		print("Sending Robot Status Updates Disabled")
