@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "207.23.164.170"
+SERVER_ADDRESS		= "192.168.1.74"
 
 # ROBOT		
 		
@@ -78,23 +78,25 @@ class CarCountWorker(QThread):
 		super(QThread, self).__init__()
 		self.robot_name = robot_name
 		context = zmq.Context()
-		self.socket = context.socket(zmq.REP)
-		self.socket.bind("tcp://" + str(address) + ":" + str(port))
+		self.subscriber = context.socket(zmq.SUB)
+		self.subscriber.bind("tcp://" + str(address) + ":" + str(port))
+		self.subscriber.setsockopt(zmq.SUBSCRIBE, self.robot_name.encode('utf-8')) #subscribes to a specific robot
 	
 	def run(self):
 		print(self.robot_name + ' Car Counting Thread Started')
 		try:
 			self.running = True
 			while self.running:
-				car_count = self.socket.recv().decode('utf-8')
-				print(car_count)
+				[robot_publisher,car_count] = self.subscriber.recv_multipart().decode('utf-8')
+				print("Recieved %s cars from Robot %s" % robot_publisher,car_count)
+				
 				#Colin needs to send empty string when he starts the program
 				#So this is to ignore that empty string 
 				#if car_count != '':
 				self.sig.emit(car_count)
 					
 				time.sleep(0.5)
-				self.socket.send(b"7")
+				#self.socket.send(b"7")
 
 		finally:
 			print(self.robot_name + 'Car Thread done')

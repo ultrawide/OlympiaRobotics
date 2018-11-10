@@ -22,7 +22,7 @@ VIDEO_HEIGHT	= 480
 SMBUS_CONTROLLER = 1			# i2c bus controller
 ARDUINO_I2C_ADDRESS = 0x04		# address of the arduino on the i2c bus
 
-SERVER = "207.23.164.170"			# ip address of the controller
+SERVER = "192.168.1.74"			# ip address of the controller
 
 #add more commands here
 
@@ -229,24 +229,22 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 # - IR emergency vehicle sensor status. should be True if there is an emergency vehicle approaching
 #   or False if there isn't an emergency vehcile approaching
 # - IR emergency vehicle sensor status stays True until the controller resets the status
-def publish_robot_status(socket2, i2c_enabled, bus):
+def publish_robot_status(publisher, i2c_enabled, bus):
 	try:
 		while True:
-			socket2.send(''.encode('utf-8'))
-			message = socket2.recv()
-			if message == "7":
-				print("Retrieving car count from arduino")
-				writeNumber(bus,ARDUINO_I2C_ADDRESS, 1)
-				time.sleep(0.05)
-				carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
-				print("From Arduino, I received car count: ", carCount)
-				socket2.send(str(carCount).encode('utf-8'))
-				message = socket2.recv()
+			print("Publishing car count from arduino")
+			writeNumber(bus,ARDUINO_I2C_ADDRESS, 1)
+			time.sleep(0.05)
+			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
+			print("From Arduino, I received car count: ", carCount)
+			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8')])
+			time.sleep(0.5)
+			print("Published car count to %s" % robot_name)
 
 	except KeyboardInterrupt:
 		print("process command interrupted")
 	try:
-		socket2.close()
+		publisher.close()
 		sys.exit(0)
 	except SystemExit:
 		os._exit(0)
@@ -300,15 +298,15 @@ if __name__ == "__main__":
 	# the robot is the publisher while the controller is the subscriber
 	# The CarCountWorker in gui.py receives the status information from the robot
 	# It should be able to work with any changes you make here to the sockets
-	# (2) please give socket2 a better name
+	# (2) please give publisher a better name
 	# (3) fix publish_robot_status function so that it works with the pub sub network model
 	# (4) fix CarCountWorker in gui.py so it works with the publish subscribe model.
 	# (5) the interval for status updates should be .5 seconds
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
-		socket2 = context.socket(zmq.REQ)
-		socket2.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
-		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=socket2,																	bus=bus))
+		publisher = context.socket(zmq.PUB)
+		publisher.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
+		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,																	bus=bus))
 		publish_status_thread.start()
 	else:
 		print("Sending Robot Status Updates Disabled")
