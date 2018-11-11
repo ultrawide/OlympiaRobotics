@@ -3,7 +3,7 @@ import socket
 import struct
 import time
 import picamera
-from threading import Thread
+from threading import Thread, Lock
 import zmq
 import sys
 import configparser
@@ -32,11 +32,14 @@ SERVER = "207.23.164.170"			# ip address of the controller
 # MESSAGES FROM ROBOT
 READY = 'R'						# send after the robot establishes a connection and is ready for commands
 
+# SYNCHRONIZATION FOR i2C INTERFACE
+lock = Lock()
+
 # Configration class that reads configuraiton data from a file
 class RobotConfig:
 	GENERAL_SECTION = 'OPTIONS'
 	SERVER_ADDRESS_CFG = 'server_address'
-	STATUS_PORT_CVG = 'status_port'
+	STATUS_PORT_CFG = 'status_port'
 	VIDEO_PORT_CFG = 'video_port'
 	COMMAND_PORT_CFG = 'command_port'
 	ROBOT_NAME_CFG = 'robot_name'
@@ -159,7 +162,7 @@ def send_video(socket):
 # bus is the i2c bus controller on the pi used to communicate with the arduinos
 # FRANK
 # - add synchronization to any parts of the code that access Arduino
-def process_command(socket, pwm_enabled, i2c_enabled, bus):
+def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 	
 	if pwm_enabled:
 		print(robot_name + " motors are enabled")
@@ -195,70 +198,66 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 			elif command == robotcommands.CMD_ROBOT_RESET_COUNT: # reset car count
 				print("Resetting car count from arduino")
 				if i2c_enabled:
-					# TODO lock
-					writeNumber(bus, ARDUINO_I2C_ADDRESS, 2)
+					lock.acquire()
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					# TODO unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("Car count reset to zero")
 			elif command == robotcommands.CMD_DISPLAY_STOP: #Display Stop Sign on LED
 				print("Displaying Stop Sign on Arduino")
-				if i2c_enabled:
-					# TODO: lock ( any time we access the arduino we need to make sure that the process_command thread
-					# is also not accessing the arduino.  Use some synchronization every time we access the communicate
-					# with the arduino.
-					#
-					# Any time we access the adruino, we need to synchronize
+				if i2c_enabled and signboard_enabled:
+                                        lock.acquire()
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_STOP))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					#Arduino needs to send the same number back to confirm that it processed correctly
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					# unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("RoboFlagger LED displaying 'STOP'")
 			elif command == robotcommands.CMD_DISPLAY_EMERGENCY: #Display Emergency Sign on LED
 				print("Displaying Emergency Sign on Arduino")
-				if i2c_enabled:
-					# TODO lock
+				if i2c_enabled and signboard_enabled:
+                                        lock.acquire()
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_EMERGENCY))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					# TODO unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("RoboFlagger LED displaying 'EMERGENCY'")
 			elif command == robotcommands.CMD_DISPLAY_PROBLEM: #Display Problem Sign on LED
 				print("Displaying Problem Sign on Arduino")
-				if i2c_enabled:
-					# TODO lock
+				if i2c_enabled and signboard_enabled:
+                                        lock.acquire()
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROBLEM))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					# TODO unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("RoboFlagger LED displaying 'PROBLEM'")	
 			elif command == robotcommands.CMD_DISPLAY_PROCEED: #Display Proceed Sign on LED
 				print("Displaying Proceed Sign on Arduino")
-				if i2c_enabled:
-					# TODO lock
+				if i2c_enabled and signboard_enabled:
+                                        lock.acquire()
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
-					# TODO unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("RoboFlagger LED displaying 'PROCEED'")
 			elif command == robotcommands.CMD_RESET_EMERGENCY: #Display Reset Emergency 
 				print("Displaying Reset Emergency")
 				if i2c_enabled:
-					# TODO lock
+                                        lock.acquire()
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
-					# TODO unlock
+                                        lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("RoboFlagger Reseting Emergency")
@@ -286,23 +285,28 @@ def process_command(socket, pwm_enabled, i2c_enabled, bus):
 # FRANK
 # - send the emergency vehicle flag from adruino to controller anlong with
 #   the carcount.
-def publish_robot_status(publisher, i2c_enabled, bus):
+def publish_robot_status(socket, i2c_enabled, bus):
 	try:
 		while True:
 			print("Publishing car count from arduino")
+                        lock.acquire()
 			# TODO: lock ( any time we access the arduino we need to make sure that the process_command thread
 			# is also not accessing the arduino.  Use some synchronization every time we access the communicate
 			# with the arduino
-			writeNumber(bus,ARDUINO_I2C_ADDRESS, robotcommands.CMD_DEV_COUNT)
+			writeNumber(bus,ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_COUNT))
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			print("From Arduino, I received car count: ", carCount)
+                        writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
+                        time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+                        emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			# TODO: also grab the emergency vehicle flag status from the arduino
 			# TODO: publish to the emergency vehicle flag status along with car count
-			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8')])
-			# TODO: unlock
+			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8'), str(emergencyFlag).encode('utf-8')])
+                        lock.release()
 			time.sleep(STATUS_UPDATE_DELAY)	
 			print("Published car count to %s" % robot_name)
+                        print("Published emergency flag to %s" % robot_name)
 			
 
 	except KeyboardInterrupt:
@@ -324,6 +328,7 @@ if __name__ == "__main__":
 
 	i2c_enabled = rc.get_option_bool(rc.USE_I2C_CFG)
 	pwm_enabled = rc.get_option_bool(rc.USE_PWM_CFG)
+        signboard_enabled = rc.get_option_bool(rc.HAS_SIGNBOARD_CFG)
 
 	bus = smbus.SMBus(SMBUS_CONTROLLER) #i2c bus controller
 
@@ -349,6 +354,7 @@ if __name__ == "__main__":
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
 											pwm_enabled=pwm_enabled, 
 											i2c_enabled=i2c_enabled, 
+                                                                                        signboard_enabled = signboard_enabled, 
 											bus=bus))
 		command_thread.start()
 		print(robot_name + " : Started command processing thread")
@@ -358,7 +364,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
 		publisher = context.socket(zmq.PUB)
-		publisher.connect("tcp://" + SERVER + ":" + rc.get_option(rc.STATUS_PORT_CFG))	
+		publisher.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
 		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,
 											  i2c_enabled=i2c_enabled,
 											  bus=bus))
