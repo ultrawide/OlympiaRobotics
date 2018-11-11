@@ -88,9 +88,12 @@ class RobotStatusWorker(QThread):
 		try:
 			self.running = True
 			while self.running:
-				[robot_publisher,car_count] = self.subscriber.recv_multipart().decode('utf-8')
-				print("Recieved %s cars from Robot %s" % robot_publisher,car_count)
-				self.sig.emit(car_count)				
+				#[robot_publisher,car_count] = self.subscriber.recv_multipart().decode('utf-8')
+				[robot_publisher,car_count] = self.subscriber.recv_multipart()
+				car_count = car_count.decode('utf-8')
+				
+				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
+				self.sig.emit(str(car_count))				
 				time.sleep(0.5)
 		finally:
 			print(self.robot_name + 'Car Thread done')
