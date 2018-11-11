@@ -73,7 +73,7 @@ class RobotCommandWorker(QThread):
 # current number of cars that have travelled passed the robot.  It also gets the emergency
 # vehicle approaching flag from the robot.
 class RobotStatusWorker(QThread):
-	sig = pyqtSignal(str)
+	sig = pyqtSignal(str,str)
 
 	def __init__(self, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
@@ -88,12 +88,12 @@ class RobotStatusWorker(QThread):
 		try:
 			self.running = True
 			while self.running:
-				#[robot_publisher,car_count] = self.subscriber.recv_multipart().decode('utf-8')
-				[robot_publisher,car_count] = self.subscriber.recv_multipart()
+				[robot_publisher,car_count, emergency_flag] = self.subscriber.recv_multipart()
 				car_count = car_count.decode('utf-8')
+				emergency_flag = emergency_flag.decode('utf-8')
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
-				self.sig.emit(str(car_count))				
+				self.sig.emit(str(car_count), str(emergency_flag))			
 				time.sleep(0.5)
 		finally:
 			print(self.robot_name + 'Car Thread done')
@@ -173,7 +173,7 @@ class RobotControl(QWidget):
 		self.car_count_label = QLabel('0')
 		self.car_count_reader = RobotStatusWorker(self.server_address, self.count_port, self.robot_name)
 		self.car_count_reader.start()
-		self.car_count_reader.sig.connect(self.on_updated_count)
+		self.car_count_reader.sig.connect(self.on_update_status)
 		status_layout.addWidget(self.car_count_label)
 		layout.addLayout(status_layout)
 
@@ -212,19 +212,37 @@ class RobotControl(QWidget):
 		layout.addWidget(self.cbox)
 		self.cbox.activated.connect(self.switch_signboard)
 
-	def on_updated_count(self, car_count):
+		#Button for Resetting Emergency
+		self.reset_emergency_button = QPushButton(self.robot_name + 'Reset Emergency Flag')
+		layout.addWidget(self.reset_emergency_button)
+		self.reset_emergency_button.clicked.connect(self.on_emergency_not_approach)
+		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
+		
+
+
+	def on_update_status(self, car_count, emergency_flag):
 		print('car count updated')
 		self.car_count_label.setText(str(car_count))
+		if (emergency_flag == '1'): #True
+			self.on_emergency_approach()
+		else: #False
+			self.on_emergency_not_approach()
+
 
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
 	def on_emergency_approach(self):
 		#TODO just to test the function and change the color when emergency vehicle is approaching
 		           #need to be adjusted
-		emergency_desc_label.setStyleSheet('color: red')
-		emergency_ans_label.setStyleSheet('color: red')
-		emergency_ans_label.setText("Aproaching")
+		self.emergency_desc_label.setStyleSheet('color: red')
+		self.emergency_ans_label.setStyleSheet('color: red')
+		self.emergency_ans_label.setText("Aproaching")
 	
+	def on_emergency_not_approach(self):
+		self.emergency_desc_label.setStyleSheet('color: black')
+		self.emergency_ans_label.setStyleSheet('color: black')
+		self.emergency_ans_label.setText("None")
+
 	# tells the robot to switch its sign from slow or stop
 	def switch_sign(self):
 		if (self.sign_slow == True):
@@ -264,6 +282,8 @@ class RobotControl(QWidget):
 		else:
 			print ("Received unknown signboard command")
 		
+	def reset_emergency_flag(self):
+		self.robot_command_worker.add_command(robotcommands.CMD_RESET_EMERGENCY)
 
 # Main application GUI
 class MainWindow(QWidget):
