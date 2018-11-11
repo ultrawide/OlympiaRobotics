@@ -1,0 +1,11 @@
+[OPTIONS]
+robot_name = Robot2
+video_port = 8003
+command_port = 8004
+status_port = 8005
+has_signboard = 0
+send_video = 1 
+send_status = 1
+rcv_commands = 1
+use_pwm = 1
+use_i2c = 1
