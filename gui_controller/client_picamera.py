@@ -297,12 +297,16 @@ def publish_robot_status(socket, i2c_enabled, bus):
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			print("From Arduino, I received car count: ", carCount)
+                        writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
+                        time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+                        emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			# TODO: also grab the emergency vehicle flag status from the arduino
 			# TODO: publish to the emergency vehicle flag status along with car count
-			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8')])
+			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8'), str(emergencyFlag).encode('utf-8')])
                         lock.release()
 			time.sleep(STATUS_UPDATE_DELAY)	
 			print("Published car count to %s" % robot_name)
+                        print("Published emergency flag to %s" % robot_name)
 			
 
 	except KeyboardInterrupt:

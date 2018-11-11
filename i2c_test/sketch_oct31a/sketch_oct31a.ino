@@ -17,6 +17,18 @@
 #define C   A2
 #define D   A3
 
+// ARDUINO COMMANDS
+int RECEIVED_CMD = 0;
+
+#define RESET_CAR_COUNT 1
+#define WRITE_CAR_COUNT 2
+#define RESET_EMERGENCY_FLAG 7
+#define WRITE_EMERGENCY_FLAG 9
+#define DISPLAY_STOP 8
+#define DISPLAY_EMERGENCY_VEHICLES_ONLY 4
+#define DISPLAY_PROBLEM 5
+#define DISPLAY_PROCEED_SLOWLY 6
+
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 
 // Car Counting US Sensor PINS
@@ -24,7 +36,6 @@ int ECHOPIN = 7;
 int TRIGPIN = 6;
 
 // CarCount Variables
-int number = 0;
 int distance = 0;
 int duration = 0;
 int carCount = 0;
@@ -37,7 +48,7 @@ int LEDPIN = 3;
 // IR Sensor Variables
 IRrecv irrecv(RECVPIN);
 decode_results results;
-bool isEmergency = false;
+int isEmergency = 0;
 
 void setup() {
   Serial.begin(9600); // start serial for output
@@ -71,7 +82,6 @@ void setup() {
 }
 
 void loop() {
-  //LED_Display();
   IR_Detector();
   Car_Count();
   delay(1000);
@@ -80,19 +90,19 @@ void loop() {
 // callback for received data
 void receiveData(int byteCount){
   while(Wire.available()) {
-    number = Wire.read();
+    RECEIVED_CMD = Wire.read();
     Serial.print("data received: ");
-    Serial.println(number);
-    switch (number)
+    Serial.println(RECEIVED_CMD);
+    switch (RECEIVED_CMD)
     {
-      case 8: // STOP
+      case DISPLAY_STOP: // STOP
         matrix.setTextSize(2); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(4, 8);
         matrix.setTextColor(matrix.Color333(7,0,0));
         matrix.print("Stop!");
         break;
-      case 4: // Emergency Vehicles only
+      case DISPLAY_EMERGENCY_VEHICLES_ONLY: // Emergency Vehicles only
         matrix.setTextSize(1); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(5, 3);
@@ -103,7 +113,7 @@ void receiveData(int byteCount){
         matrix.setCursor(19, 22);
         matrix.print("Only");
         break;
-      case 5: // Stop there is a problem
+      case DISPLAY_PROBLEM: // Stop there is a problem
         matrix.setTextSize(1); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(2, 0);
@@ -123,7 +133,7 @@ void receiveData(int byteCount){
         matrix.setCursor(12, 24);
         matrix.print("patient");
         break;
-      case 6: // Proceed slowly
+      case DISPLAY_PROCEED_SLOWLY: // Proceed slowly
         matrix.setTextSize(1); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(6, 6);
@@ -138,27 +148,21 @@ void receiveData(int byteCount){
 
 // callback for sending data
 void sendData(){
-  if (number == 1)
+  if (RECEIVED_CMD == RESET_CAR_COUNT)
   {
     carCount = 0;
   }
-  else if (number == 2)
+  else if (RECEIVED_CMD == WRITE_CAR_COUNT)
   {
     Wire.write(carCount);
   }
-  else if (number == 6)
+  else if (RECEIVED_CMD == RESET_EMERGENCY_FLAG)
   {
-    matrix.setTextSize(1); 
-    matrix.fillScreen(matrix.Color333(0, 0, 0));
-    matrix.setCursor(6, 6);
-    matrix.setTextColor(matrix.Color333(7,1,0));
-    matrix.print("Proceed");
-    matrix.setCursor(20, 16);
-    matrix.print("Slowly");
+    isEmergency = 0;
   }
-  else if (number == 7)
+  else if (RECEIVED_CMD == WRITE_EMERGENCY_FLAG)
   {
-    isEmergency = false;
+    Wire.write(isEmergency);
   }
 }
 
@@ -201,7 +205,7 @@ void IR_Detector()
 {
   if (irrecv.decode(&results)) {
     Serial.println(results.value, HEX);
-    isEmergency = true;
+    isEmergency = 1;
     irrecv.resume();
   }
 }
