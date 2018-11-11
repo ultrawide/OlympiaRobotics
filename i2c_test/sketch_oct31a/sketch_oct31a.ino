@@ -201,7 +201,6 @@ void IR_Detector()
 {
   if (irrecv.decode(&results)) {
     Serial.println(results.value, HEX);
-    delay(1000);
     isEmergency = true;
     irrecv.resume();
   }
