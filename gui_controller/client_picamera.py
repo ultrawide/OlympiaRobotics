@@ -254,7 +254,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 				print("Displaying Reset Emergency")
 				if i2c_enabled:
                                         lock.acquire()
-					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
+					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET_EMERGENCY))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
                                         lock.release()
