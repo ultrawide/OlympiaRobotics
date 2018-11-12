@@ -25,7 +25,7 @@ ARDUINO_I2C_RESPONSE_TIME = 0.05	# the amount of time to wait for a response fro
 
 STATUS_UPDATE_DELAY = 0.5		# time to wait until next status update is sent
 
-SERVER = "207.23.164.170"			# ip address of the controller
+SERVER = "10.0.0.92"			# ip address of the controller
 
 #add more commands here
 
@@ -91,7 +91,7 @@ def readNumber(bus, address):
 # I2C end
 
 #------------------------------- Ada Fruit setup -----------------------
-#pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
+pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
 servo_min = 150  # Min pulse length out of 4096
 servo_max = 600  # Max pulse length out of 4096
 def set_servo_pulse(channel, pulse):
@@ -103,13 +103,13 @@ def set_servo_pulse(channel, pulse):
     pulse *= 1000
     pulse //= pulse_length
     pwm.set_pwm(channel, 0, pulse)
-    pwm.set_pwm_freq(50)
+pwm.set_pwm_freq(50)
 #------------------------------- Lowers Robot stop hand  -----------------------
 
 def arm_down(cur_pos, end_pos):
 	pos = cur_pos
 	step_size = 10
-
+        print("Arm down command")
 	while pos > end_pos:
 		pos = pos - step_size
 		if (pos < servo_min):
@@ -181,8 +181,9 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			if command == robotcommands.CMD_ROBOT_STOP:
 				print("set RoboFlagger to 'Stop' configuration")
 				if pwm_enabled:
-					pwm.set_pwm(0, 0, 400)
-					pwm.set_pwm(1, 0, servo_min)
+                                    print("PWM enabled: Stop")
+                                    pwm.set_pwm(0, 0, 400)
+                                    pwm.set_pwm(1, 0, servo_min)
 				else:
 					print("PWM disabled")
 				socket.send_string("RoboFlagger in 'Stop' configuration")
@@ -190,7 +191,9 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			elif command == robotcommands.CMD_ROBOT_SLOW:
 				print("set RoboFlagger to 'Slow' Configuration")
 				if pwm_enabled:
+                                        print("PWM enabled: Slow")
 					arm_down(400, servo_min)
+					pwm.set_pwm(1,0,servo_max)
 				else:
 					print("PWM disabled")
 				socket.send_string("RoboFlagger in 'Slow' configuration")
@@ -297,6 +300,7 @@ def publish_robot_status(socket, i2c_enabled, bus):
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			print("From Arduino, I received car count: ", carCount)
+                        time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
