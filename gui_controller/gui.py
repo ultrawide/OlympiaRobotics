@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "207.23.164.170"
+SERVER_ADDRESS		= "192.168.0.188"
 
 # ROBOT		
 		
@@ -34,13 +34,12 @@ class RobotCommandWorker(QThread):
 	sig = pyqtSignal(str)
 	command_queue = queue.Queue()  # need some kind of queue. can this one work? https://docs.python.org/3/library/queue.html
 	
-	def __init__(self, address, port, robot_name, parent=None):
+	def __init__(self, context, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
 		self.car_count = 0
 		self.robot_name = robot_name
 		
 		# setup command socket
-		context = zmq.Context()
 		self.command_socket = context.socket(zmq.REP)
 		self.command_socket.bind("tcp://" + str(address) + ':' + str(port))
 		
@@ -75,10 +74,9 @@ class RobotCommandWorker(QThread):
 class RobotStatusWorker(QThread):
 	sig = pyqtSignal(str,str)
 
-	def __init__(self, address, port, robot_name, parent=None):
+	def __init__(self, context, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
 		self.robot_name = robot_name
-		context = zmq.Context()
 		self.subscriber = context.socket(zmq.SUB)
 		self.subscriber.bind("tcp://" + str(address) + ":" + str(port))
 		self.subscriber.setsockopt(zmq.SUBSCRIBE, self.robot_name.encode('utf-8')) #subscribes to a specific robot
@@ -137,7 +135,7 @@ class FrameReaderWorker(QThread):
 
 # RobotControl is a widget that controls a single robot		
 class RobotControl(QWidget):
-	def __init__(self, robot_name, server_address, video_port, command_port, count_port):
+	def __init__(self, robot_name, context, server_address, video_port, command_port, count_port):
 		QWidget.__init__(self)
 		self.robot_name = robot_name
 		self.server_address = server_address
@@ -147,6 +145,7 @@ class RobotControl(QWidget):
 		self.emergency_vehicle = True
 		self.sign_slow = False
 		self.video_frame_file = robot_name + '_video.jpg'
+		self.context = context
 
 		# load graphics for sign_pos_label
 		self.stop_pic = QPixmap('Stop.png')
@@ -171,9 +170,9 @@ class RobotControl(QWidget):
 		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 		status_layout.addWidget(label)
 		self.car_count_label = QLabel('0')
-		self.car_count_reader = RobotStatusWorker(self.server_address, self.count_port, self.robot_name)
-		self.car_count_reader.start()
-		self.car_count_reader.sig.connect(self.on_update_status)
+		self.robot_status_worker = RobotStatusWorker(self.context, self.server_address, self.count_port, self.robot_name)
+		self.robot_status_worker.start()
+		self.robot_status_worker.sig.connect(self.on_update_status)
 		status_layout.addWidget(self.car_count_label)
 		layout.addLayout(status_layout)
 
@@ -198,7 +197,7 @@ class RobotControl(QWidget):
 		# slow/stop button
 		self.slow_stop_button = QPushButton(self.robot_name + ' Slow/Stop Button')
 		self.slow_stop_button.clicked.connect(self.switch_sign)
-		self.robot_command_worker =	RobotCommandWorker(self.server_address, self.command_port, self.robot_name)
+		self.robot_command_worker =	RobotCommandWorker(self.context, self.server_address, self.command_port, self.robot_name)
 		self.robot_command_worker.start()
 		layout.addWidget(self.slow_stop_button)
 
@@ -217,8 +216,6 @@ class RobotControl(QWidget):
 		layout.addWidget(self.reset_emergency_button)
 		self.reset_emergency_button.clicked.connect(self.on_emergency_not_approach)
 		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
-		
-
 
 	def on_update_status(self, car_count, emergency_flag):
 		print('car count updated')
@@ -227,7 +224,6 @@ class RobotControl(QWidget):
 			self.on_emergency_approach()
 		else: #False
 			self.on_emergency_not_approach()
-
 
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
@@ -288,17 +284,20 @@ class RobotControl(QWidget):
 # Main application GUI
 class MainWindow(QWidget):
 
-	def __init__(self, *args, **kwargs):
-		QWidget.__init__(self, *args, **kwargs)	
+	def __init__(self):
+		QWidget.__init__(self)
 
-		r1 = RobotControl('Robot1', SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		context = zmq.Context()
+
+		r1 = RobotControl('Robot1', context, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', context, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
 		layout.addWidget(r2)
 
 		self.show()
+		
 
 #Main 
 if __name__ == '__main__':
