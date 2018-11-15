@@ -1,6 +1,7 @@
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from threading import Thread, Lock
 import os
 import sys
 import time
@@ -13,18 +14,24 @@ import queue
 import robotcommands
 
 # CONSTANTS
-VIDEO_WIDTH		= 640
+VIDEO_WIDTH			= 640
 VIDEO_HEIGHT		= 480
 
 R1_VIDEO_PORT		= 8000
 R1_COMMAND_PORT		= 8001
-R1_COUNT_PORT		= 8002
+R1_STATUS_PORT		= 8002
 
 R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
-R2_COUNT_PORT		= 8005
+R2_STATUS_PORT		= 8005
 
 SERVER_ADDRESS		= "192.168.0.188"
+
+ROBOT1_NAME = "Robot1"
+ROBOT2_NAME = "Robot2"
+
+SIGN_STATUS_SLOW = "Slow"
+SIGN_STATUS_STOP = "Stop"
 
 # ROBOT		
 		
@@ -72,7 +79,7 @@ class RobotCommandWorker(QThread):
 # current number of cars that have travelled passed the robot.  It also gets the emergency
 # vehicle approaching flag from the robot.
 class RobotStatusWorker(QThread):
-	sig = pyqtSignal(str,str)
+	sig = pyqtSignal(str, str, str)
 
 	def __init__(self, context, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
@@ -86,12 +93,12 @@ class RobotStatusWorker(QThread):
 		try:
 			self.running = True
 			while self.running:
-				[robot_publisher,car_count, emergency_flag] = self.subscriber.recv_multipart()
+				[robot_publisher,car_count, emergency_flag, sign_status] = self.subscriber.recv_multipart()
 				car_count = car_count.decode('utf-8')
 				emergency_flag = emergency_flag.decode('utf-8')
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
-				self.sig.emit(str(car_count), str(emergency_flag))			
+				self.sig.emit(robot_publisher, str(car_count), str(emergency_flag))			
 				time.sleep(0.5)
 		finally:
 			print(self.robot_name + 'Car Thread done')
@@ -135,13 +142,13 @@ class FrameReaderWorker(QThread):
 
 # RobotControl is a widget that controls a single robot		
 class RobotControl(QWidget):
-	def __init__(self, robot_name, context, server_address, video_port, command_port, count_port):
+	def __init__(self, robot_name, context, server_address, video_port, command_port, status_port):
 		QWidget.__init__(self)
 		self.robot_name = robot_name
 		self.server_address = server_address
 		self.video_port = video_port
 		self.command_port = command_port
-		self.count_port = count_port
+		self.status_port = status_port
 		self.emergency_vehicle = True
 		self.sign_slow = False
 		self.video_frame_file = robot_name + '_video.jpg'
@@ -166,14 +173,14 @@ class RobotControl(QWidget):
 		self.sign_pos_label = QLabel('')
 		self.sign_pos_label.setPixmap(self.stop_pic)
 		status_layout.addWidget(self.sign_pos_label)
-		label = QLabel('Cars passed: ', self)
-		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-		status_layout.addWidget(label)
+		#label = QLabel('Cars passed: ', self)
+		#label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+		#status_layout.addWidget(label)
 		self.car_count_label = QLabel('0')
-		self.robot_status_worker = RobotStatusWorker(self.context, self.server_address, self.count_port, self.robot_name)
+		self.robot_status_worker = RobotStatusWorker(self.context, self.server_address, self.status_port, self.robot_name)
 		self.robot_status_worker.start()
-		self.robot_status_worker.sig.connect(self.on_update_status)
-		status_layout.addWidget(self.car_count_label)
+		#self.robot_status_worker.sig.connect(self.on_update_status)
+		#status_layout.addWidget(self.car_count_label)
 		layout.addLayout(status_layout)
 
 		# emergency vehicle status layout
@@ -217,6 +224,7 @@ class RobotControl(QWidget):
 		self.reset_emergency_button.clicked.connect(self.on_emergency_not_approach)
 		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
 
+	# updates the carcount and the emergency vehicle status of the robot
 	def on_update_status(self, car_count, emergency_flag):
 		print('car count updated')
 		self.car_count_label.setText(str(car_count))
@@ -225,11 +233,11 @@ class RobotControl(QWidget):
 		else: #False
 			self.on_emergency_not_approach()
 
+	# updates the labels pixmap with the one from the robot
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
+
 	def on_emergency_approach(self):
-		#TODO just to test the function and change the color when emergency vehicle is approaching
-		           #need to be adjusted
 		self.emergency_desc_label.setStyleSheet('color: red')
 		self.emergency_ans_label.setStyleSheet('color: red')
 		self.emergency_ans_label.setText("Aproaching")
@@ -287,17 +295,52 @@ class MainWindow(QWidget):
 	def __init__(self):
 		QWidget.__init__(self)
 
+		self.lock = Lock()
+		self.r1_count = 0
+		self.r2_count = 0
+		self.total_count = 0
 		context = zmq.Context()
+		
+		# Robot Controls
+		r1 = RobotControl(ROBOT1_NAME, context, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_STATUS_PORT)
+		r2 = RobotControl(ROBOT2_NAME, context, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_STATUS_PORT)
+		r1.robot_status_worker.sig.connect(self.on_update_status)
+		r2.robot_status_worker.sig.connect(self.on_update_status)
 
-		r1 = RobotControl('Robot1', context, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		vlayout = QVBoxLayout(self)
 
-		layout = QHBoxLayout(self)
+		# Total Count of cars moving between robots
+		count_layout = QHBoxLayout()
+		label = QLabel("Cars moving between robots:")
+		label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+		self.total_count_label = QLabel('0')
+		count_layout.addWidget(label)
+		self.total_count_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+		count_layout.addWidget(self.total_count_label)
+		vlayout.addLayout(count_layout)
+
+		layout = QHBoxLayout()
 		layout.addWidget(r1)
 		layout.addWidget(r2)
+		vlayout.addLayout(layout)
 
 		self.show()
-		
+	
+	# updates the total car count between robots label
+	def on_update_status(self, robot, car_count, emergency_flag):
+		if robot == ROBOT1_NAME:
+			self.r1_count = int(car_count)
+			self.r1_emergency_flag = bool(emergency_flag)
+		else:
+			self.r2_count = int(car_count)
+			self.r2_emergency_flag = bool(emergency_flag)
+
+		self.lock.acquire()
+		self.total_count = abs(self.r1_count - self.r2_count)
+		self.lock.release()
+		self.total_count_label.setText(str(self.total_count))
+
+
 
 #Main 
 if __name__ == '__main__':
