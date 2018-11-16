@@ -21,11 +21,11 @@ VIDEO_HEIGHT	= 480
 
 SMBUS_CONTROLLER = 1			# i2c bus controller
 ARDUINO_I2C_ADDRESS = 0x04		# address of the arduino on the i2c bus
-ARDUINO_I2C_RESPONSE_TIME = 0.05	# the amount of time to wait for a response from arduino after writing to the i2c
+ARDUINO_I2C_RESPONSE_TIME = 0.1	# the amount of time to wait for a response from arduino after writing to the i2c
 
 STATUS_UPDATE_DELAY = 0.5		# time to wait until next status update is sent
 
-SERVER = "10.0.0.92"			# ip address of the controller
+SERVER = "207.23.218.244"			# ip address of the controller
 
 #add more commands here
 
@@ -91,7 +91,6 @@ def readNumber(bus, address):
 # I2C end
 
 #------------------------------- Ada Fruit setup -----------------------
-pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
 servo_min = 150  # Min pulse length out of 4096
 servo_max = 600  # Max pulse length out of 4096
 def set_servo_pulse(channel, pulse):
@@ -102,8 +101,6 @@ def set_servo_pulse(channel, pulse):
     print('{0}us per bit'.format(pulse_length))
     pulse *= 1000
     pulse //= pulse_length
-    pwm.set_pwm(channel, 0, pulse)
-pwm.set_pwm_freq(50)
 #------------------------------- Lowers Robot stop hand  -----------------------
 
 def arm_down(cur_pos, end_pos):
@@ -332,6 +329,10 @@ if __name__ == "__main__":
 
 	i2c_enabled = rc.get_option_bool(rc.USE_I2C_CFG)
 	pwm_enabled = rc.get_option_bool(rc.USE_PWM_CFG)
+        if pwm_enabled:
+            pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
+            pwm.set_pwm_freq(50)
+            pwm.set_pwm(channel, 0, pulse)
 	signboard_enabled = rc.get_option_bool(rc.HAS_SIGNBOARD_CFG)
 
 	bus = smbus.SMBus(SMBUS_CONTROLLER) #i2c bus controller
