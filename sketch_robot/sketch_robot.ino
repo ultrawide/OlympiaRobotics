@@ -1,10 +1,13 @@
-// Refer to readme.txt to install library depedencies
+  }// Refer to readme.txt to install library depedencies
 
 #include <gamma.h>
 #include <RGBmatrixPanel.h>
 //#include <IRremote.h> 
 #include <Wire.h>
 
+
+// DEBUG
+#define DEBUG 1 // set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -16,6 +19,7 @@
 #define B   A1
 #define C   A2
 #define D   A3
+
 
 // ARDUINO COMMANDS
 int RECEIVED_CMD = 0;
@@ -56,7 +60,11 @@ int LEDPIN = 3;
 int isEmergency = 0;
 
 void setup() {
-  Serial.begin(9600); // start serial for output
+  if (DEBUG == 1)
+  {
+    Serial.begin(9600); // start serial for output
+  }
+  
   // initialize i2c as slave
   Wire.begin(SLAVE_ADDRESS);
   
@@ -107,8 +115,12 @@ void loop() {
 void receiveData(int byteCount){
   while(Wire.available()) {
     RECEIVED_CMD = Wire.read();
-    //Serial.print("data received: ");
-    //Serial.println(RECEIVED_CMD);
+    
+    if (DEBUG == 1) {
+      Serial.print("data received: ");
+      Serial.println(RECEIVED_CMD);
+    }
+    
     switch (RECEIVED_CMD)
     {
       case DISPLAY_STOP: // STOP
@@ -200,21 +212,23 @@ void Car_Count()
 
   // Calculating the distance
   distance = duration*0.034/2;
-
-  //Prints the distance on the serial Monitor
-  Serial.print("Distance: ");
-  Serial.println(distance);
-
-  if (distance <= 150 && enableCount)
+  
+  if (distance <= 150 && distance >= 0 && enableCount)
   {
     enableCount = false;
     carCount += 1;
-    Serial.print("Car count: ");
-    Serial.println(carCount); 
   }
   else if (distance > 150)
   {
     enableCount = true; 
+  }
+  
+    //Prints the distance on the serial Monitor
+  if (DEBUG == 1) {
+    Serial.print("Distance: ");
+    Serial.println(distance);
+    Serial.print("Car count: ");
+    Serial.println(carCount); 
   }
 }
 
@@ -225,11 +239,13 @@ void IR_Detector()
     isEmergency = 1;
   }
 
-  if (isEmergency == 1) {
-    Serial.println("Approaching");
-  }
-  else {
-    Serial.println("Not");
+  if (DEBUG == 1) {
+    if (isEmergency == 1) {
+      Serial.println("Approaching");
+    }
+    else {
+      Serial.println("Not");
+    }
   }
   
 }
