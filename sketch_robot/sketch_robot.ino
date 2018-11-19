@@ -2,7 +2,7 @@
 
 #include <gamma.h>
 #include <RGBmatrixPanel.h>
-#include <IRremote.h> 
+//#include <IRremote.h> 
 #include <Wire.h>
 
 // I2C 
@@ -32,8 +32,8 @@ int RECEIVED_CMD = 0;
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 
 // Car Counting US Sensor PINS
-int ECHOPIN = 7;
-int TRIGPIN = 6;
+int ECHOPIN = 2;
+int TRIGPIN = 3;
 
 // CarCount Variables
 int distance = 0;
@@ -41,13 +41,18 @@ int duration = 0;
 int carCount = 0;
 bool enableCount = false;
 
+// time 
+int curTime = 0;
+int carCountTime = 0;
+int irTime = 0;
+
 // IR SENSOR PINS
 int RECVPIN = 12;
 int LEDPIN = 3;
 
 // IR Sensor Variables
-IRrecv irrecv(RECVPIN);
-decode_results results;
+//IRrecv irrecv(RECVPIN);
+//decode_results results;
 int isEmergency = 0;
 
 void setup() {
@@ -67,8 +72,8 @@ void setup() {
   Serial.println("Car Count Ready!");
 
   /// IR SENSOR SETUP ///
-  irrecv.enableIRIn(); // Start the receiver
-  Serial.println("Enabled IRin");
+  //irrecv.enableIRIn(); // Start the receiver
+  //Serial.println("Enabled IRin");
 
   /// LED DISPLAY ///
   matrix.begin();
@@ -81,18 +86,29 @@ void setup() {
   matrix.setCursor(8, 0); // start at top left, with 8 pixel of spacing
 }
 
+
 void loop() {
-  IR_Detector();
-  Car_Count();
-  delay(1000);
+  curTime = millis();
+  
+  if (curTime >= irTime){
+    IR_Detector();
+    irTime = millis() + 300;
+  }
+
+  curTime = millis();
+  if (curTime >= carCountTime){
+    Car_Count();
+    carCountTime = millis() + 150;  
+  }
+// nice save
 }
 
 // callback for received data
 void receiveData(int byteCount){
   while(Wire.available()) {
     RECEIVED_CMD = Wire.read();
-    Serial.print("data received: ");
-    Serial.println(RECEIVED_CMD);
+    //Serial.print("data received: ");
+    //Serial.println(RECEIVED_CMD);
     switch (RECEIVED_CMD)
     {
       case DISPLAY_STOP: // STOP
@@ -133,7 +149,7 @@ void receiveData(int byteCount){
         matrix.setCursor(12, 24);
         matrix.print("patient");
         break;
-      case DISPLAY_PROCEED_SLOWLY: // Proceed slowly
+      case DISPLAY_PROCEED_SLOWLY: // Proceed slowly.    
         matrix.setTextSize(1); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(6, 6);
@@ -169,22 +185,24 @@ void sendData(){
 // Car Count 
 void Car_Count()
 {
+  cli(); // disables interrupts
   digitalWrite(TRIGPIN, LOW);
   delayMicroseconds(2);
  
   digitalWrite(TRIGPIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIGPIN, LOW);
- 
+
   // Reads the echoPin, returns the sound wave travel time in
   // microseconds
   duration = pulseIn(ECHOPIN, HIGH);
+  sei(); // enables interrupts
 
   // Calculating the distance
   distance = duration*0.034/2;
 
   //Prints the distance on the serial Monitor
-  Serial.print("Car Count Distance: ");
+  Serial.print("Distance: ");
   Serial.println(distance);
 
   if (distance <= 150 && enableCount)
@@ -203,9 +221,15 @@ void Car_Count()
 // Do we want an LED to light up instead?
 void IR_Detector()
 {
-  if (irrecv.decode(&results)) {
-    Serial.println(results.value, HEX);
+  if (digitalRead(12) == 0) {
     isEmergency = 1;
-    irrecv.resume();
   }
+
+  if (isEmergency == 1) {
+    Serial.println("Approaching");
+  }
+  else {
+    Serial.println("Not");
+  }
+  
 }
