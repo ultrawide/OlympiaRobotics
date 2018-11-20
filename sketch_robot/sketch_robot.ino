@@ -234,3 +234,25 @@ void IR_Detector()
     }
   }  
 }
+
+#define NUM_READINGS 5
+int distanceArray[NUM_READINGS] = {0};
+
+// Add a value to the array into array's index
+void addToArray(int* array, int index, int value) 
+{
+  array[index++] = value;
+  if (index == NUM_READINGS)
+    index = 0;
+}
+
+// Returns true when all elements of the input array are below the threshhodl value
+int isConsistent(int* array, int threshhold)
+{
+  for (int i = 0; i < NUM_READINGS; i++)
+  {
+    if (array[i] > threshhold)
+      return 0;
+  }
+  return 1; 
+}
