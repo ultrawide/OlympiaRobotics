@@ -13,7 +13,7 @@ import queue
 import robotcommands
 
 # CONSTANTS
-VIDEO_WIDTH		= 640
+VIDEO_WIDTH			= 640
 VIDEO_HEIGHT		= 480
 
 R1_VIDEO_PORT		= 8000
@@ -24,10 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "192.168.0.188"
-
-# ROBOT		
-		
+#SERVER_ADDRESS = "10.0.0.95"
 
 # Sends commands to the robot
 class RobotCommandWorker(QThread):
@@ -104,6 +101,7 @@ class FrameReaderWorker(QThread):
 	def __init__(self, address, port, video_frame_file):
 		super(QThread, self).__init__()
 		self.image_loc =  video_frame_file
+		print("Listening for video connection from Robot")
 		self.server_socket = socket.socket()
 		self.server_socket.bind((address,port))
 		self.server_socket.listen(0)
@@ -135,7 +133,7 @@ class FrameReaderWorker(QThread):
 
 # RobotControl is a widget that controls a single robot		
 class RobotControl(QWidget):
-	def __init__(self, robot_name, context, server_address, video_port, command_port, count_port):
+	def __init__(self, robot_name, context, ip_find_port, server_address, video_port, command_port, count_port):
 		QWidget.__init__(self)
 		self.robot_name = robot_name
 		self.server_address = server_address
@@ -155,6 +153,29 @@ class RobotControl(QWidget):
 		# TODO resize pic so we don't need to scale it
 		self.slow_pic = self.slow_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
 		self.create_widget()
+		self.show()
+
+		#IP 
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		print(robot_name + "starting up on" + server_address)
+		sock.bind((server_address, ip_find_port))
+		sock.listen(0)
+		print("listening")
+		connection, client_address = sock.accept()
+		#print ('connection from', client_address)
+
+		try:
+			# show who connected to us
+			print ('connection from', client_address)
+		finally:
+			print("connection closed")
+			connection.close()
+			
+		
+		sock.close()
+		print("socket closed")
+
+		
 
 	def create_widget(self):
 		# main layout widget
@@ -283,22 +304,27 @@ class RobotControl(QWidget):
 
 # Main application GUI
 class MainWindow(QWidget):
-
 	def __init__(self):
 		QWidget.__init__(self)
 
+
+		# get my ip stuff here
+		hostname = socket.gethostname()
+		IPAddr = socket.gethostbyname(hostname)
+		print("Your Computer IP Address is:" + IPAddr)
+		SERVER_ADDRESS = IPAddr
+		# create TCP/IP socket
 		context = zmq.Context()
 
-		r1 = RobotControl('Robot1', context, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		#r1 = RobotControl('Robot1', context, 8007, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', context, 8006, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
-		layout.addWidget(r1)
+		#layout.addWidget(r1)
 		layout.addWidget(r2)
 
 		self.show()
 		
-
 #Main 
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
