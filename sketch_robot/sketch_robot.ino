@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 // DEBUG
-#define DEBUG 1 // set DEBUG 0 to turn off print statements
+#define DEBUG 0 // set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -234,7 +234,7 @@ void IR_Detector()
     }
   }  
 }
-
+/*
 #define NUM_READINGS 5
 #define ABOVE_THRESHHOLD 1
 #define BELOW_THRESHHOLD 0
@@ -275,16 +275,18 @@ int confirmReading(int currentReading, int* distanceFlag)
 		if (distanceFlag == ABOVE_THRESHHOLD && distance > DISTANCE_THRESHHOLD)
 			return 0;
 		
-		if (distanceFlag == BELOW_THRESHHOLD && distance < DISTANCE_THRESHOLD)
+		if (distanceFlag == BELOW_THRESHHOLD && distance < DISTANCE_THRESHHOLD)
 			return 0;
 	}
 
 	sei(); // enables interrupts
 	
 	if (distanceFlag == ABOVE_THRESHHOLD)
-		*distanceFlag = BELOW_THRESH_HOLD;
+		*distanceFlag = BELOW_THRESHHOLD;
 	else
-		*distanceFlag = ABOVE_THRESH_HOLD;
+		*distanceFlag = ABOVE_THRESHHOLD;
 
 	return 1;
 }
+
+*/
