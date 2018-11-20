@@ -25,7 +25,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_STATUS_PORT		= 8005
 
-SERVER_ADDRESS		= "192.168.0.188"
+SERVER_ADDRESS		= "207.23.198.157"
 
 ROBOT1_NAME = "Robot1"
 ROBOT2_NAME = "Robot2"
@@ -93,12 +93,12 @@ class RobotStatusWorker(QThread):
 		try:
 			self.running = True
 			while self.running:
-				[robot_publisher,car_count, emergency_flag, sign_status] = self.subscriber.recv_multipart()
+				[robot_publisher,car_count, emergency_flag] = self.subscriber.recv_multipart()
 				car_count = car_count.decode('utf-8')
 				emergency_flag = emergency_flag.decode('utf-8')
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
-				self.sig.emit(robot_publisher, str(car_count), str(emergency_flag))			
+				self.sig.emit(str(robot_publisher), str(car_count), str(emergency_flag))			
 				time.sleep(0.5)
 		finally:
 			print(self.robot_name + 'Car Thread done')
