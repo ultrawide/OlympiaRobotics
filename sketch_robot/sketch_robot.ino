@@ -108,7 +108,6 @@ void loop() {
     Car_Count();
     carCountTime = millis() + 150;  
   }
-// nice save
 }
 
 // callback for received data
