@@ -236,23 +236,55 @@ void IR_Detector()
 }
 
 #define NUM_READINGS 5
-int distanceArray[NUM_READINGS] = {0};
+#define ABOVE_THRESHHOLD 1
+#define BELOW_THRESHHOLD 0
+#define DISTANCE_THRESHHOLD 150
+int distanceFlag = BELOW_THRESHHOLD;
 
-// Add a value to the array into array's index
-void addToArray(int* array, int index, int value) 
+// This function tries to reduce false noisy readings by
+// making NUM_READINGS additional readings to confirm it
+int confirmReading(int currentReading, int* distanceFlag)
 {
-  array[index++] = value;
-  if (index == NUM_READINGS)
-    index = 0;
-}
+	int distance = 0;
+	int duration = 0;
 
-// Returns true when all elements of the input array are below the threshhodl value
-int isConsistent(int* array, int threshhold)
-{
-  for (int i = 0; i < NUM_READINGS; i++)
-  {
-    if (array[i] > threshhold)
-      return 0;
-  }
-  return 1; 
+	if (distanceFlag == ABOVE_THRESHOLD && currentReading > DISTANCE_THRESHHOLD)
+		return 0;
+
+	if (distanceFlag == BELOW_THRESHHOLD && currentReading < DISTANCE_THRESHHOLD)
+		return 0;
+
+	cli(); // disables interrupts
+
+	for (int i = 0; i < NUM_READINGS; i++)
+	{
+		digitalWrite(TRIGPIN, LOW);
+		delayMicroseconds(2);
+		
+		digitalWrite(TRIGPIN, HIGH);
+		delayMicroseconds(10);
+		digitalWrite(TRIGPIN, LOW);
+
+		// Reads the echoPin, returns the sound wave travel time in
+		// microseconds
+		duration = pulseIn(ECHOPIN, HIGH);
+
+		// Calculating the distance
+		distance = duration*0.034/2;
+		
+		if (distanceFlag == ABOVE_THRESHHOLD && distance > DISTANCE_THRESHHOLD)
+			return 0;
+		
+		if (distanceFlag == BELOW_THRESHHOLD && distance < DISTANCE_THRESHOLD)
+			return 0;
+	}
+
+	sei(); // enables interrupts
+	
+	if (distanceFlag == ABOVE_THRESHHOLD)
+		*distanceFlag = BELOW_THRESH_HOLD;
+	else
+		*distanceFlag = ABOVE_THRESH_HOLD;
+
+	return 1;
 }
