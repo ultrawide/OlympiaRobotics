@@ -1,10 +1,6 @@
-  }// Refer to readme.txt to install library depedencies
-
 #include <gamma.h>
-#include <RGBmatrixPanel.h>
-//#include <IRremote.h> 
+#include <RGBmatrixPanel.h> 
 #include <Wire.h>
-
 
 // DEBUG
 #define DEBUG 1 // set DEBUG 0 to turn off print statements
@@ -20,10 +16,10 @@
 #define C   A2
 #define D   A3
 
-
-// ARDUINO COMMANDS
+// ARDUINO COMMANDS RECEIVED FROM THE RASPBERRY PI OVER i2C
 int RECEIVED_CMD = 0;
 
+// COMMANDS THAT THE ARDUINO WILL INTERPRET
 #define RESET_CAR_COUNT 1
 #define WRITE_CAR_COUNT 2
 #define RESET_EMERGENCY_FLAG 7
@@ -45,7 +41,7 @@ int duration = 0;
 int carCount = 0;
 bool enableCount = false;
 
-// time 
+// Determines the frequency of function calls in the main loop
 int curTime = 0;
 int carCountTime = 0;
 int irTime = 0;
@@ -55,8 +51,6 @@ int RECVPIN = 12;
 int LEDPIN = 3;
 
 // IR Sensor Variables
-//IRrecv irrecv(RECVPIN);
-//decode_results results;
 int isEmergency = 0;
 
 void setup() {
@@ -78,10 +72,6 @@ void setup() {
   pinMode(TRIGPIN, OUTPUT); // Sets the trigPin as an output
   pinMode(ECHOPIN, INPUT);  // Sets the echoPin as an input
   Serial.println("Car Count Ready!");
-
-  /// IR SENSOR SETUP ///
-  //irrecv.enableIRIn(); // Start the receiver
-  //Serial.println("Enabled IRin");
 
   /// LED DISPLAY ///
   matrix.begin();
@@ -110,7 +100,7 @@ void loop() {
   }
 }
 
-// callback for received data
+// callback for received data from i2c data wire
 void receiveData(int byteCount){
   while(Wire.available()) {
     RECEIVED_CMD = Wire.read();
@@ -173,7 +163,7 @@ void receiveData(int byteCount){
   }
 }
 
-// callback for sending data
+// callback for sending data to the raspberry pi
 void sendData(){
   if (RECEIVED_CMD == RESET_CAR_COUNT)
   {
@@ -193,7 +183,6 @@ void sendData(){
   }
 }
 
-// Car Count 
 void Car_Count()
 {
   cli(); // disables interrupts
@@ -204,8 +193,7 @@ void Car_Count()
   delayMicroseconds(10);
   digitalWrite(TRIGPIN, LOW);
 
-  // Reads the echoPin, returns the sound wave travel time in
-  // microseconds
+  // Reads the echoPin, returns the sound wave travel time in microseconds
   duration = pulseIn(ECHOPIN, HIGH);
   sei(); // enables interrupts
 
@@ -231,7 +219,6 @@ void Car_Count()
   }
 }
 
-// Do we want an LED to light up instead?
 void IR_Detector()
 {
   if (digitalRead(12) == 0) {
@@ -245,6 +232,5 @@ void IR_Detector()
     else {
       Serial.println("Not");
     }
-  }
-  
+  }  
 }
