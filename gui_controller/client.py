@@ -101,6 +101,7 @@ def set_servo_pulse(channel, pulse):
     print('{0}us per bit'.format(pulse_length))
     pulse *= 1000
     pulse //= pulse_length
+    pwm.set_pwm(channel, 0, pulse)
 #------------------------------- Lowers Robot stop hand  -----------------------
 
 def arm_down(cur_pos, end_pos):
@@ -332,7 +333,6 @@ if __name__ == "__main__":
         if pwm_enabled:
             pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
             pwm.set_pwm_freq(50)
-            pwm.set_pwm(channel, 0, pulse)
 	signboard_enabled = rc.get_option_bool(rc.HAS_SIGNBOARD_CFG)
 
 	bus = smbus.SMBus(SMBUS_CONTROLLER) #i2c bus controller
