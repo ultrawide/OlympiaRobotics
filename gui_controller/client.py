@@ -25,12 +25,25 @@ ARDUINO_I2C_RESPONSE_TIME = 0.1	# the amount of time to wait for a response from
 
 STATUS_UPDATE_DELAY = 0.5		# time to wait until next status update is sent
 
-SERVER = "207.23.218.244"			# ip address of the controller
-
 #add more commands here
 
 # MESSAGES FROM ROBOT
 READY = 'R'						# send after the robot establishes a connection and is ready for commands
+
+
+# scanning IP addresses to auto connect to controller
+def test_socket(ip):
+    
+    socket_obj = socket.socket() #socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    socket_obj.settimeout(0.5)
+    result = socket_obj.connect_ex((ip,8006))
+    socket_obj.close()
+    if (result != 0):
+        print("Did not connect succesfully")
+        return False
+    else:
+        print("Did connect to %s" % ip)
+        return True
 
 # SYNCHRONIZATION FOR i2C INTERFACE
 lock = Lock()
@@ -326,6 +339,29 @@ if __name__ == "__main__":
 	robot_name = rc.get_option_str(rc.ROBOT_NAME_CFG)
 	print("Robots name is " + robot_name)
 
+	ip_result = False
+	ip_number = 90
+	connect_attempts = 0
+	SERVER = ""
+	while ip_result == False:
+
+		fixedDigits = '10.0.0.'  
+		digits =  str(ip_number)
+		SERVER = '%s%s'% (fixedDigits,digits)
+		print("The IP is %s"% SERVER)
+		ip_result = test_socket(SERVER)
+		if(ip_result == True):
+			break
+		elif (ip_number == 255):
+			ip_number = 0
+		elif(ip_number == 90 ):
+			connect_attempts += 1
+		elif( connect_attempts > 3):
+			print ("Attempted connection %d times. " % connect_attempts)
+			print("Unable to find network. Aborting.")
+			break
+		ip_number += 1
+
 	context = zmq.Context()
 
 	i2c_enabled = rc.get_option_bool(rc.USE_I2C_CFG)
@@ -340,7 +376,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_VIDEO_CFG):
 		# Socket for sending video frames to controller
 		video_socket = socket.socket()
-		video_socket.connect((SERVER, int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
+		video_socket.connect((str(SERVER), int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
 		print("Established pipe for video stream")
 
 		# pass the required socket to the thread in an argument
@@ -354,7 +390,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.RCV_COMMANDS_CFG):		
 		# processes commands from the controller
 		command_socket = context.socket(zmq.REQ)
-		command_socket.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
+		command_socket.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
 		print(robot_name + " : Established pipe for receiving commands")
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
 																	pwm_enabled=pwm_enabled, 
@@ -369,7 +405,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
 		publisher = context.socket(zmq.PUB)
-		publisher.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
+		publisher.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
 		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,
 											  i2c_enabled=i2c_enabled,
 											  bus=bus))
