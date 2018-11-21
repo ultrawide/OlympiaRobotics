@@ -94,20 +94,20 @@ def readNumber(bus, address):
 servo_min = 150  # Min pulse length out of 4096
 servo_max = 600  # Max pulse length out of 4096
 def set_servo_pulse(channel, pulse):
-    pulse_length = 1000000    # 1,000,000 us per second
-    pulse_length //= 60       # 60 Hz
-    print('{0}us per period'.format(pulse_length))
-    pulse_length //= 4096     # 12 bits of resolution
-    print('{0}us per bit'.format(pulse_length))
-    pulse *= 1000
-    pulse //= pulse_length
-    pwm.set_pwm(channel, 0, pulse)
+	pulse_length = 1000000    # 1,000,000 us per second
+	pulse_length //= 60       # 60 Hz
+	print('{0}us per period'.format(pulse_length))
+	pulse_length //= 4096     # 12 bits of resolution
+	print('{0}us per bit'.format(pulse_length))
+	pulse *= 1000
+	pulse //= pulse_length
+	pwm.set_pwm(channel, 0, pulse)
 #------------------------------- Lowers Robot stop hand  -----------------------
 
 def arm_down(cur_pos, end_pos):
 	pos = cur_pos
 	step_size = 10
-        print("Arm down command")
+	print("Arm down command")
 	while pos > end_pos:
 		pos = pos - step_size
 		if (pos < servo_min):
@@ -148,7 +148,7 @@ def send_video(socket):
 	finally:
 		connection.close()
 		socket.close()
-        
+		
 
 # The process_command function receives commands from the controller
 # and tells the robot to perform each action.  When each action is completed
@@ -179,9 +179,9 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			if command == robotcommands.CMD_ROBOT_STOP:
 				print("set RoboFlagger to 'Stop' configuration")
 				if pwm_enabled:
-                                    print("PWM enabled: Stop")
-                                    pwm.set_pwm(0, 0, 400)
-                                    pwm.set_pwm(1, 0, servo_min)
+									print("PWM enabled: Stop")
+									pwm.set_pwm(0, 0, 400)
+									pwm.set_pwm(1, 0, servo_min)
 				else:
 					print("PWM disabled")
 				socket.send_string("RoboFlagger in 'Stop' configuration")
@@ -189,7 +189,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			elif command == robotcommands.CMD_ROBOT_SLOW:
 				print("set RoboFlagger to 'Slow' Configuration")
 				if pwm_enabled:
-                                        print("PWM enabled: Slow")
+					print("PWM enabled: Slow")
 					arm_down(400, servo_min)
 					pwm.set_pwm(1,0,servo_max)
 				else:
@@ -298,7 +298,7 @@ def publish_robot_status(socket, i2c_enabled, bus):
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			print("From Arduino, I received car count: ", carCount)
-                        time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
@@ -330,9 +330,9 @@ if __name__ == "__main__":
 
 	i2c_enabled = rc.get_option_bool(rc.USE_I2C_CFG)
 	pwm_enabled = rc.get_option_bool(rc.USE_PWM_CFG)
-        if pwm_enabled:
-            pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
-            pwm.set_pwm_freq(50)
+	if pwm_enabled:
+		pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
+		pwm.set_pwm_freq(50)
 	signboard_enabled = rc.get_option_bool(rc.HAS_SIGNBOARD_CFG)
 
 	bus = smbus.SMBus(SMBUS_CONTROLLER) #i2c bus controller
@@ -359,7 +359,7 @@ if __name__ == "__main__":
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
 																	pwm_enabled=pwm_enabled, 
 																	i2c_enabled=i2c_enabled, 
-                                                                    signboard_enabled = signboard_enabled, 
+																	signboard_enabled = signboard_enabled, 
 																	bus=bus))
 		command_thread.start()
 		print(robot_name + " : Started command processing thread")
