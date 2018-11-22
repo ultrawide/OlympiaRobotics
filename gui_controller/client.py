@@ -283,6 +283,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
+						time.sleep(.01)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET_EMERGENCY))
@@ -329,6 +330,12 @@ def publish_robot_status(socket, i2c_enabled, bus):
                             # TODO: lock ( any time we access the arduino we need to make sure that the process_command thread
                             # is also not accessing the arduino.  Use some synchronization every time we access the communicate
                             # with the arduino
+                            while (GPIO.input(35) == 1):
+                                    print("arduino has interrupts disbaled")
+                                    time.sleep(.01)
+                                    continue
+                            GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
+
                             writeNumber(bus,ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_COUNT))
                             time.sleep(ARDUINO_I2C_RESPONSE_TIME)
                             carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
@@ -339,10 +346,12 @@ def publish_robot_status(socket, i2c_enabled, bus):
                             time.sleep(ARDUINO_I2C_RESPONSE_TIME)
                             emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
                             prevEmergencyFlag = emergencyFlag
+			    GPIO.output(37, GPIO.LOW)
                             # TODO: also grab the emergency vehicle flag status from the arduino
                             # TODO: publish to the emergency vehicle flag status along with car count
                         except IOError as e:
                             print(e)
+			    GPIO.output(37, GPIO.LOW)
                             carCount = prevCarCount
                             emergencyFlag = prevEmergencyFlag
                             
@@ -378,13 +387,14 @@ if __name__ == "__main__":
 	ip_result = False
         ip_number = 0
 	connect_attempts = 0
+	controller_ip = ""
 	while ip_result == False:
                 baseip = robo_library.get_ip('wlan0')
                 baseip = str(baseip).split('.')
                 baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
-		check_ip  = baseip + str(ip_number)
-		print("Checking ip " + check_ip)
-		ip_result = test_socket(check_ip)
+		controller_ip  = baseip + str(ip_number)
+		print("Checking ip " + controller_ip)
+		ip_result = test_socket(controller_ip)
 		
 		if (ip_number == 255):
 			ip_number = 0
@@ -395,6 +405,7 @@ if __name__ == "__main__":
 		if( connect_attempts > 3):
 			print ("Attempted connection %d times. " % connect_attempts)
 			print("Unable to find network. Aborting.")
+			sys.exit()
 			break
 
 	context = zmq.Context()
@@ -411,7 +422,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_VIDEO_CFG):
 		# Socket for sending video frames to controller
 		video_socket = socket.socket()
-		video_socket.connect((str(SERVER), int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
+		video_socket.connect((str(controller_ip), int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
 		print("Established pipe for video stream")
 
 		# pass the required socket to the thread in an argument
@@ -425,7 +436,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.RCV_COMMANDS_CFG):		
 		# processes commands from the controller
 		command_socket = context.socket(zmq.REQ)
-		command_socket.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
+		command_socket.connect("tcp://" + str(controller_ip) + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
 		print(robot_name + " : Established pipe for receiving commands")
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
 																	pwm_enabled=pwm_enabled, 
@@ -440,7 +451,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
 		publisher = context.socket(zmq.PUB)
-		publisher.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
+		publisher.connect("tcp://" + str(controller_ip) + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
 		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,
 											  i2c_enabled=i2c_enabled,
 											  bus=bus))
