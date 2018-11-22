@@ -35,8 +35,8 @@ READY = 'R'						# send after the robot establishes a connection and is ready fo
 def test_socket(ip):
     
     socket_obj = socket.socket() #socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    socket_obj.settimeout(0.5)
-    result = socket_obj.connect_ex((ip,8006))
+    socket_obj.settimeout(0.1)
+    result = socket_obj.connect_ex((ip,8007))
     socket_obj.close()
     if (result != 0):
         print("Did not connect succesfully")
@@ -340,12 +340,12 @@ if __name__ == "__main__":
 	print("Robots name is " + robot_name)
 
 	ip_result = False
-	ip_number = 90
+        ip_number :0
 	connect_attempts = 0
 	SERVER = ""
 	while ip_result == False:
 
-		fixedDigits = '10.0.0.'  
+		fixedDigits = '207.23.219.'  
 		digits =  str(ip_number)
 		SERVER = '%s%s'% (fixedDigits,digits)
 		print("The IP is %s"% SERVER)
