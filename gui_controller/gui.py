@@ -92,7 +92,7 @@ class RobotStatusWorker(QThread):
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
 				self.sig.emit(str(car_count), str(emergency_flag))			
-				time.sleep(1)
+				time.sleep(.25)
 		finally:
 			print(self.robot_name + 'Car Thread done')
 
@@ -240,7 +240,7 @@ class RobotControl(QWidget):
 		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
 
 	def on_update_status(self, car_count, emergency_flag):
-		print('car count updated')
+		print('car count is ' + car_count)
 		self.car_count_label.setText(str(car_count))
 		if (emergency_flag == '1'): #True
 			self.on_emergency_approach()
