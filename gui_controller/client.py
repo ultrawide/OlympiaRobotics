@@ -10,10 +10,6 @@ import configparser
 import robotcommands
 import RPi.GPIO as GPIO
 
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(37, GPIO.OUT)
-GPIO.setup(35, GPIO.IN, GPIO.PUD_UP)
-
 #robot library
 import Adafruit_PCA9685
 import smbus #for i2c			# must enabled for SMBUS
@@ -223,16 +219,15 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 				print("Resetting car count from arduino")
 				if i2c_enabled:
 					lock.acquire()
-                                        while (GPIO.input(35) == 1):
-                                            print("arduino has interrupts disbaled")
-                                            continue
-                                        GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
+					while (GPIO.input(35) == 1):
+						print("arduino has interrupts disbaled")
+						continue
+					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
-                                        prevCarCount = 0
-
-                                        GPIO.output(37, GPIO.LOW)
+					prevCarCount = 0
+                    GPIO.output(37, GPIO.LOW)
 					lock.release()
 				else:
 					print("i2c disabled")
@@ -285,16 +280,15 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 				print("Reset Emergency Flag")
 				if i2c_enabled:
 					lock.acquire()
-                                        while (GPIO.input(35) == 1):
-                                            print("arduino has interrupts disbaled")
-                                            continue
-                                        GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
-                                        print("we are telling arduino to shut up")
+					while (GPIO.input(35) == 1):
+						print("arduino has interrupts disbaled")
+						continue
+					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET_EMERGENCY))
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					verify = readNumber(bus, ARDUINO_I2C_ADDRESS)
-                                        prevEmergencyFlag = 0
-                                        GPIO.output(37, GPIO.LOW)
+					prevEmergencyFlag = 0
+					GPIO.output(37, GPIO.LOW)
 					lock.release()
 				else:
 					print("i2c disabled")
@@ -366,12 +360,19 @@ def publish_robot_status(socket, i2c_enabled, bus):
 	except SystemExit:
 		os._exit(0)
 
+def setup_pi_gpio():
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setup(37, GPIO.OUT)
+	GPIO.setup(35, GPIO.IN, GPIO.PUD_UP)	
+
 if __name__ == "__main__":
 	# gets cfg options from a config file instead of hardcoding 
 	# then we wont need to have two versions of this file (one for each robot)
 	rc = RobotConfig(CONFIG_FILENAME)
 	robot_name = rc.get_option_str(rc.ROBOT_NAME_CFG)
 	print("Robots name is " + robot_name)
+
+	setup_pi_gpio()
 
 	ip_result = False
         ip_number = 0
