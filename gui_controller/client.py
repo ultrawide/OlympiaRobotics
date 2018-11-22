@@ -38,11 +38,11 @@ READY = 'R'						# send after the robot establishes a connection and is ready fo
 
 
 # scanning IP addresses to auto connect to controller
-def test_socket(ip):
+def test_socket(ip, port):
     
     socket_obj = socket.socket() #socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     socket_obj.settimeout(0.1)
-    result = socket_obj.connect_ex((ip,8007))
+    result = socket_obj.connect_ex((ip,port))
     socket_obj.close()
     if (result != 0):
         print("Did not connect succesfully")
@@ -68,6 +68,8 @@ class RobotConfig:
 	RCV_COMMANDS_CFG = 'rcv_commands'	#receive commands from controller
 	USE_PWM_CFG = 'use_pwm'				#enables motors
 	USE_I2C_CFG = 'use_i2c'				#enables i2c
+	NETWORK_ADAPTER_CFG = 'network_adapter'
+	IP_LOCATION_PORT_CFG = 'ip_controller_port'
 	
 	def __init__(self, config_filename):
 		self.config_filename = config_filename
@@ -388,13 +390,14 @@ if __name__ == "__main__":
         ip_number = 0
 	connect_attempts = 0
 	controller_ip = ""
+	location_port = rc.get_option_str(rc.IP_LOCATION_PORT_CFG)
 	while ip_result == False:
-                baseip = robo_library.get_ip('wlan0')
-                baseip = str(baseip).split('.')
-                baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
+		baseip = robo_library.get_ip(rc.get_option_str(rc.NETWORK_ADAPTER_CFG))
+		baseip = str(baseip).split('.')
+		baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
 		controller_ip  = baseip + str(ip_number)
 		print("Checking ip " + controller_ip)
-		ip_result = test_socket(controller_ip)
+		ip_result = test_socket(controller_ip, location_port)
 		
 		if (ip_number == 255):
 			ip_number = 0
