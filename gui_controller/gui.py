@@ -92,7 +92,7 @@ class RobotStatusWorker(QThread):
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
 				self.sig.emit(str(car_count), str(emergency_flag))			
-				time.sleep(0.5)
+				time.sleep(1)
 		finally:
 			print(self.robot_name + 'Car Thread done')
 
@@ -318,11 +318,11 @@ class MainWindow(QWidget):
 		context = zmq.Context()
 
 		r1 = RobotControl('Robot1', context, 8007, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, 8006, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		#r2 = RobotControl('Robot2', context, 8006, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
-		layout.addWidget(r2)
+		#layout.addWidget(r2)
 
 		self.show()
 		
