@@ -135,7 +135,7 @@ class FrameReaderWorker(QThread):
 
 # RobotControl is a widget that controls a single robot		
 class RobotControl(QWidget):
-	def __init__(self, robot_name, context, server_address, video_port, command_port, count_port):
+	def __init__(self, robot_name, context, ip_find_port, server_address, video_port, command_port, count_port):
 		QWidget.__init__(self)
 		self.robot_name = robot_name
 		self.server_address = server_address
@@ -155,6 +155,28 @@ class RobotControl(QWidget):
 		# TODO resize pic so we don't need to scale it
 		self.slow_pic = self.slow_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
 		self.create_widget()
+
+		#IP 
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		print(robot_name + "starting up on" + server_address)
+		sock.bind((server_address, ip_find_port))
+		sock.listen(0)
+		print("listening")
+		connection, client_address = sock.accept()
+		#print ('connection from', client_address)
+
+		try:
+			# show who connected to us
+			print ('connection from', client_address)
+		finally:
+			print("connection closed")
+			connection.close()
+			
+		
+		sock.close()
+		print("socket closed")
+
+
 
 	def create_widget(self):
 		# main layout widget
@@ -287,10 +309,16 @@ class MainWindow(QWidget):
 	def __init__(self):
 		QWidget.__init__(self)
 
+		# get my ip stuff here
+		hostname = socket.gethostname()
+		IPAddr = socket.gethostbyname(hostname)
+		print("Your Computer IP Address is:" + IPAddr)
+		SERVER_ADDRESS = IPAddr
+		# create TCP/IP socket
 		context = zmq.Context()
 
-		r1 = RobotControl('Robot1', context, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		r1 = RobotControl('Robot1', context, 8007, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', context, 8006, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
