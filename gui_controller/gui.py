@@ -24,7 +24,7 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-SERVER_ADDRESS		= "192.168.0.188"
+#SERVER_ADDRESS		= "192.168.0.188"
 
 # ROBOT		
 		
@@ -311,14 +311,14 @@ class MainWindow(QWidget):
 
 		# get my ip stuff here
 		hostname = socket.gethostname()
-		IPAddr = socket.gethostbyname(hostname)
-		print("Your Computer IP Address is:" + IPAddr)
-		SERVER_ADDRESS = IPAddr
+		server_address = socket.gethostbyname(hostname)
+		print("Controller IP Address Found:" + server_address)
+		
 		# create TCP/IP socket
 		context = zmq.Context()
 
-		r1 = RobotControl('Robot1', context, 8007, SERVER_ADDRESS, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, 8006, SERVER_ADDRESS, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		r1 = RobotControl('Robot1', context, 8007, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', context, 8006, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
