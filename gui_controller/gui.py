@@ -1,6 +1,7 @@
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+import fcntl
 import os
 import sys
 import time
@@ -24,10 +25,21 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
-#SERVER_ADDRESS		= "192.168.0.188"
+NET_ADAPTER = 'wlp3s0'
 
-# ROBOT		
-		
+SIOCGIFADDR = 0x8915
+
+def get_ip(iface = 'wlp3s0'):
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	#ifreq = struct.pack('16sH14s')
+	ifreq = struct.pack('16sH14s'.encode('utf-8'), iface.encode('utf-8'), socket.AF_INET, ('\x00'*14).encode('utf-8'))
+	try:
+		res = fcntl.ioctl(sock.fileno(), SIOCGIFADDR, ifreq)
+	except:
+		return None
+	ip = struct.unpack('16sH2x4s8x', res)[2]
+	return socket.inet_ntoa(ip)
+	
 
 # Sends commands to the robot
 class RobotCommandWorker(QThread):
@@ -306,12 +318,11 @@ class RobotControl(QWidget):
 # Main application GUI
 class MainWindow(QWidget):
 
-	def __init__(self):
+	def __init__(self, net_adapter):
 		QWidget.__init__(self)
 
 		# get my ip stuff here
-		hostname = socket.gethostname()
-		server_address = socket.gethostbyname(hostname)
+		server_address = get_ip()
 		print("Controller IP Address Found:" + server_address)
 		
 		# create TCP/IP socket
@@ -325,10 +336,11 @@ class MainWindow(QWidget):
 		#layout.addWidget(r2)
 
 		self.show()
-		
+
+
 
 #Main 
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
-	window = MainWindow()
+	window = MainWindow(NET_ADAPTER)
 	sys.exit(app.exec_())
