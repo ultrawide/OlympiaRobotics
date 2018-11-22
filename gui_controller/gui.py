@@ -12,6 +12,7 @@ import zmq
 import time
 import queue
 import robotcommands
+import robo_library
 
 # CONSTANTS
 VIDEO_WIDTH		= 640
@@ -27,19 +28,6 @@ R2_COUNT_PORT		= 8005
 
 NET_ADAPTER = 'wlp3s0'
 
-SIOCGIFADDR = 0x8915
-
-def get_ip(iface = 'wlp3s0'):
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	#ifreq = struct.pack('16sH14s')
-	ifreq = struct.pack('16sH14s'.encode('utf-8'), iface.encode('utf-8'), socket.AF_INET, ('\x00'*14).encode('utf-8'))
-	try:
-		res = fcntl.ioctl(sock.fileno(), SIOCGIFADDR, ifreq)
-	except:
-		return None
-	ip = struct.unpack('16sH2x4s8x', res)[2]
-	return socket.inet_ntoa(ip)
-	
 
 # Sends commands to the robot
 class RobotCommandWorker(QThread):
@@ -322,8 +310,8 @@ class MainWindow(QWidget):
 		QWidget.__init__(self)
 
 		# get my ip stuff here
-		server_address = get_ip()
-		print("Controller IP Address Found:" + server_address)
+		server_address = robo_library.get_ip()
+		print("Controller IP Address Found: " + server_address)
 		
 		# create TCP/IP socket
 		context = zmq.Context()
