@@ -9,6 +9,7 @@ import sys
 import configparser
 import robotcommands
 import RPi.GPIO as GPIO
+import robo_library
 
 #robot library
 import Adafruit_PCA9685
@@ -227,8 +228,8 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
 					prevCarCount = 0
-                    GPIO.output(37, GPIO.LOW)
-					lock.release()
+                                        GPIO.output(37, GPIO.LOW)
+		    			lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("Car count reset to zero")
@@ -377,25 +378,24 @@ if __name__ == "__main__":
 	ip_result = False
         ip_number = 0
 	connect_attempts = 0
-	SERVER = ""
 	while ip_result == False:
-
-		fixedDigits = '207.23.219.'  
-		digits =  str(ip_number)
-		SERVER = '%s%s'% (fixedDigits,digits)
-		print("The IP is %s"% SERVER)
-		ip_result = test_socket(SERVER)
-		if(ip_result == True):
-			break
-		elif (ip_number == 255):
+                baseip = robo_library.get_ip('wlan0')
+                baseip = str(baseip).split('.')
+                baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
+		check_ip  = baseip + str(ip_number)
+		print("Checking ip " + check_ip)
+		ip_result = test_socket(check_ip)
+		
+		if (ip_number == 255):
 			ip_number = 0
-		elif(ip_number == 90 ):
 			connect_attempts += 1
-		elif( connect_attempts > 3):
+		else:
+			ip_number += 1
+
+		if( connect_attempts > 3):
 			print ("Attempted connection %d times. " % connect_attempts)
 			print("Unable to find network. Aborting.")
 			break
-		ip_number += 1
 
 	context = zmq.Context()
 
