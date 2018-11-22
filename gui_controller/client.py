@@ -25,12 +25,25 @@ ARDUINO_I2C_RESPONSE_TIME = 0.1	# the amount of time to wait for a response from
 
 STATUS_UPDATE_DELAY = 0.5		# time to wait until next status update is sent
 
-SERVER = "207.23.218.244"			# ip address of the controller
-
 #add more commands here
 
 # MESSAGES FROM ROBOT
 READY = 'R'						# send after the robot establishes a connection and is ready for commands
+
+
+# scanning IP addresses to auto connect to controller
+def test_socket(ip):
+    
+    socket_obj = socket.socket() #socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    socket_obj.settimeout(0.5)
+    result = socket_obj.connect_ex((ip,8006))
+    socket_obj.close()
+    if (result != 0):
+        print("Did not connect succesfully")
+        return False
+    else:
+        print("Did connect to %s" % ip)
+        return True
 
 # SYNCHRONIZATION FOR i2C INTERFACE
 lock = Lock()
@@ -94,19 +107,20 @@ def readNumber(bus, address):
 servo_min = 150  # Min pulse length out of 4096
 servo_max = 600  # Max pulse length out of 4096
 def set_servo_pulse(channel, pulse):
-    pulse_length = 1000000    # 1,000,000 us per second
-    pulse_length //= 60       # 60 Hz
-    print('{0}us per period'.format(pulse_length))
-    pulse_length //= 4096     # 12 bits of resolution
-    print('{0}us per bit'.format(pulse_length))
-    pulse *= 1000
-    pulse //= pulse_length
+	pulse_length = 1000000    # 1,000,000 us per second
+	pulse_length //= 60       # 60 Hz
+	print('{0}us per period'.format(pulse_length))
+	pulse_length //= 4096     # 12 bits of resolution
+	print('{0}us per bit'.format(pulse_length))
+	pulse *= 1000
+	pulse //= pulse_length
+	pwm.set_pwm(channel, 0, pulse)
 #------------------------------- Lowers Robot stop hand  -----------------------
 
 def arm_down(cur_pos, end_pos):
 	pos = cur_pos
 	step_size = 10
-        print("Arm down command")
+	print("Arm down command")
 	while pos > end_pos:
 		pos = pos - step_size
 		if (pos < servo_min):
@@ -147,7 +161,7 @@ def send_video(socket):
 	finally:
 		connection.close()
 		socket.close()
-        
+		
 
 # The process_command function receives commands from the controller
 # and tells the robot to perform each action.  When each action is completed
@@ -178,9 +192,9 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			if command == robotcommands.CMD_ROBOT_STOP:
 				print("set RoboFlagger to 'Stop' configuration")
 				if pwm_enabled:
-                                    print("PWM enabled: Stop")
-                                    pwm.set_pwm(0, 0, 400)
-                                    pwm.set_pwm(1, 0, servo_min)
+									print("PWM enabled: Stop")
+									pwm.set_pwm(0, 0, 400)
+									pwm.set_pwm(1, 0, servo_min)
 				else:
 					print("PWM disabled")
 				socket.send_string("RoboFlagger in 'Stop' configuration")
@@ -188,7 +202,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 			elif command == robotcommands.CMD_ROBOT_SLOW:
 				print("set RoboFlagger to 'Slow' Configuration")
 				if pwm_enabled:
-                                        print("PWM enabled: Slow")
+					print("PWM enabled: Slow")
 					arm_down(400, servo_min)
 					pwm.set_pwm(1,0,servo_max)
 				else:
@@ -297,7 +311,7 @@ def publish_robot_status(socket, i2c_enabled, bus):
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
 			print("From Arduino, I received car count: ", carCount)
-                        time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
 			time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 			emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
@@ -325,14 +339,36 @@ if __name__ == "__main__":
 	robot_name = rc.get_option_str(rc.ROBOT_NAME_CFG)
 	print("Robots name is " + robot_name)
 
+	ip_result = False
+	ip_number = 90
+	connect_attempts = 0
+	SERVER = ""
+	while ip_result == False:
+
+		fixedDigits = '10.0.0.'  
+		digits =  str(ip_number)
+		SERVER = '%s%s'% (fixedDigits,digits)
+		print("The IP is %s"% SERVER)
+		ip_result = test_socket(SERVER)
+		if(ip_result == True):
+			break
+		elif (ip_number == 255):
+			ip_number = 0
+		elif(ip_number == 90 ):
+			connect_attempts += 1
+		elif( connect_attempts > 3):
+			print ("Attempted connection %d times. " % connect_attempts)
+			print("Unable to find network. Aborting.")
+			break
+		ip_number += 1
+
 	context = zmq.Context()
 
 	i2c_enabled = rc.get_option_bool(rc.USE_I2C_CFG)
 	pwm_enabled = rc.get_option_bool(rc.USE_PWM_CFG)
-        if pwm_enabled:
-            pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
-            pwm.set_pwm_freq(50)
-            pwm.set_pwm(channel, 0, pulse)
+	if pwm_enabled:
+		pwm = Adafruit_PCA9685.PCA9685() # colin: running this line breaks my computer
+		pwm.set_pwm_freq(50)
 	signboard_enabled = rc.get_option_bool(rc.HAS_SIGNBOARD_CFG)
 
 	bus = smbus.SMBus(SMBUS_CONTROLLER) #i2c bus controller
@@ -340,7 +376,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_VIDEO_CFG):
 		# Socket for sending video frames to controller
 		video_socket = socket.socket()
-		video_socket.connect((SERVER, int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
+		video_socket.connect((str(SERVER), int(rc.get_option_str(rc.VIDEO_PORT_CFG))))
 		print("Established pipe for video stream")
 
 		# pass the required socket to the thread in an argument
@@ -354,12 +390,12 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.RCV_COMMANDS_CFG):		
 		# processes commands from the controller
 		command_socket = context.socket(zmq.REQ)
-		command_socket.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
+		command_socket.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.COMMAND_PORT_CFG))
 		print(robot_name + " : Established pipe for receiving commands")
 		command_thread = Thread(target = process_command, kwargs=dict(socket=command_socket, 
 																	pwm_enabled=pwm_enabled, 
 																	i2c_enabled=i2c_enabled, 
-                                                                    signboard_enabled = signboard_enabled, 
+																	signboard_enabled = signboard_enabled, 
 																	bus=bus))
 		command_thread.start()
 		print(robot_name + " : Started command processing thread")
@@ -369,7 +405,7 @@ if __name__ == "__main__":
 	if rc.get_option_bool(rc.SEND_STATUS_CFG):
 		#Sending status of robot to controller (carcount, emerg)
 		publisher = context.socket(zmq.PUB)
-		publisher.connect("tcp://" + SERVER + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
+		publisher.connect("tcp://" + str(SERVER) + ":" + rc.get_option_str(rc.STATUS_PORT_CFG))	
 		publish_status_thread = Thread(target = publish_robot_status, kwargs=dict(socket=publisher,
 											  i2c_enabled=i2c_enabled,
 											  bus=bus))

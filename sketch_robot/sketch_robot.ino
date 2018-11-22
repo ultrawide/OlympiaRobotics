@@ -1,10 +1,9 @@
-// Refer to readme.txt to install library depedencies
-
 #include <gamma.h>
-#include <RGBmatrixPanel.h>
-#include <IRremote.h> 
+#include <RGBmatrixPanel.h> 
 #include <Wire.h>
 
+// DEBUG
+#define DEBUG 0 // set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -17,9 +16,10 @@
 #define C   A2
 #define D   A3
 
-// ARDUINO COMMANDS
+// ARDUINO COMMANDS RECEIVED FROM THE RASPBERRY PI OVER i2C
 int RECEIVED_CMD = 0;
 
+// COMMANDS THAT THE ARDUINO WILL INTERPRET
 #define RESET_CAR_COUNT 1
 #define WRITE_CAR_COUNT 2
 #define RESET_EMERGENCY_FLAG 7
@@ -32,8 +32,8 @@ int RECEIVED_CMD = 0;
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 
 // Car Counting US Sensor PINS
-int ECHOPIN = 7;
-int TRIGPIN = 6;
+int ECHOPIN = 2;
+int TRIGPIN = 3;
 
 // CarCount Variables
 int distance = 0;
@@ -41,17 +41,24 @@ int duration = 0;
 int carCount = 0;
 bool enableCount = false;
 
+// Determines the frequency of function calls in the main loop
+int curTime = 0;
+int carCountTime = 0;
+int irTime = 0;
+
 // IR SENSOR PINS
 int RECVPIN = 12;
 int LEDPIN = 3;
 
 // IR Sensor Variables
-IRrecv irrecv(RECVPIN);
-decode_results results;
 int isEmergency = 0;
 
 void setup() {
-  Serial.begin(9600); // start serial for output
+  if (DEBUG == 1)
+  {
+    Serial.begin(9600); // start serial for output
+  }
+  
   // initialize i2c as slave
   Wire.begin(SLAVE_ADDRESS);
   
@@ -66,10 +73,6 @@ void setup() {
   pinMode(ECHOPIN, INPUT);  // Sets the echoPin as an input
   Serial.println("Car Count Ready!");
 
-  /// IR SENSOR SETUP ///
-  irrecv.enableIRIn(); // Start the receiver
-  Serial.println("Enabled IRin");
-
   /// LED DISPLAY ///
   matrix.begin();
   matrix.fillScreen(matrix.Color333(0, 0, 0));
@@ -81,18 +84,32 @@ void setup() {
   matrix.setCursor(8, 0); // start at top left, with 8 pixel of spacing
 }
 
+
 void loop() {
-  IR_Detector();
-  Car_Count();
-  delay(1000);
+  curTime = millis();
+  
+  if (curTime >= irTime){
+    IR_Detector();
+    irTime = millis() + 300;
+  }
+
+  curTime = millis();
+  if (curTime >= carCountTime){
+    Car_Count();
+    carCountTime = millis() + 150;  
+  }
 }
 
-// callback for received data
+// callback for received data from i2c data wire
 void receiveData(int byteCount){
   while(Wire.available()) {
     RECEIVED_CMD = Wire.read();
-    Serial.print("data received: ");
-    Serial.println(RECEIVED_CMD);
+    
+    if (DEBUG == 1) {
+      Serial.print("data received: ");
+      Serial.println(RECEIVED_CMD);
+    }
+    
     switch (RECEIVED_CMD)
     {
       case DISPLAY_STOP: // STOP
@@ -133,7 +150,7 @@ void receiveData(int byteCount){
         matrix.setCursor(12, 24);
         matrix.print("patient");
         break;
-      case DISPLAY_PROCEED_SLOWLY: // Proceed slowly
+      case DISPLAY_PROCEED_SLOWLY: // Proceed slowly.    
         matrix.setTextSize(1); 
         matrix.fillScreen(matrix.Color333(0, 0, 0));
         matrix.setCursor(6, 6);
@@ -146,7 +163,7 @@ void receiveData(int byteCount){
   }
 }
 
-// callback for sending data
+// callback for sending data to the raspberry pi
 void sendData(){
   if (RECEIVED_CMD == RESET_CAR_COUNT)
   {
@@ -166,46 +183,110 @@ void sendData(){
   }
 }
 
-// Car Count 
 void Car_Count()
 {
+  cli(); // disables interrupts
   digitalWrite(TRIGPIN, LOW);
   delayMicroseconds(2);
  
   digitalWrite(TRIGPIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIGPIN, LOW);
- 
-  // Reads the echoPin, returns the sound wave travel time in
-  // microseconds
+
+  // Reads the echoPin, returns the sound wave travel time in microseconds
   duration = pulseIn(ECHOPIN, HIGH);
+  sei(); // enables interrupts
 
   // Calculating the distance
   distance = duration*0.034/2;
-
-  //Prints the distance on the serial Monitor
-  Serial.print("Car Count Distance: ");
-  Serial.println(distance);
-
-  if (distance <= 150 && enableCount)
+  
+  if (distance <= 150 && distance >= 0 && enableCount)
   {
     enableCount = false;
     carCount += 1;
-    Serial.print("Car count: ");
-    Serial.println(carCount); 
   }
   else if (distance > 150)
   {
     enableCount = true; 
   }
-}
-
-// Do we want an LED to light up instead?
-void IR_Detector()
-{
-  if (irrecv.decode(&results)) {
-    Serial.println(results.value, HEX);
-    isEmergency = 1;
-    irrecv.resume();
+  
+    //Prints the distance on the serial Monitor
+  if (DEBUG == 1) {
+    Serial.print("Distance: ");
+    Serial.println(distance);
+    Serial.print("Car count: ");
+    Serial.println(carCount); 
   }
 }
+
+void IR_Detector()
+{
+  if (digitalRead(12) == 0) {
+    isEmergency = 1;
+  }
+
+  if (DEBUG == 1) {
+    if (isEmergency == 1) {
+      Serial.println("Approaching");
+    }
+    else {
+      Serial.println("Not");
+    }
+  }  
+}
+/*
+#define NUM_READINGS 5
+#define ABOVE_THRESHHOLD 1
+#define BELOW_THRESHHOLD 0
+#define DISTANCE_THRESHHOLD 150
+int distanceFlag = BELOW_THRESHHOLD;
+
+// This function tries to reduce false noisy readings by
+// making NUM_READINGS additional readings to confirm it
+int confirmReading(int currentReading, int* distanceFlag)
+{
+	int distance = 0;
+	int duration = 0;
+
+	if (distanceFlag == ABOVE_THRESHOLD && currentReading > DISTANCE_THRESHHOLD)
+		return 0;
+
+	if (distanceFlag == BELOW_THRESHHOLD && currentReading < DISTANCE_THRESHHOLD)
+		return 0;
+
+	cli(); // disables interrupts
+
+	for (int i = 0; i < NUM_READINGS; i++)
+	{
+		digitalWrite(TRIGPIN, LOW);
+		delayMicroseconds(2);
+		
+		digitalWrite(TRIGPIN, HIGH);
+		delayMicroseconds(10);
+		digitalWrite(TRIGPIN, LOW);
+
+		// Reads the echoPin, returns the sound wave travel time in
+		// microseconds
+		duration = pulseIn(ECHOPIN, HIGH);
+
+		// Calculating the distance
+		distance = duration*0.034/2;
+		
+		if (distanceFlag == ABOVE_THRESHHOLD && distance > DISTANCE_THRESHHOLD)
+			return 0;
+		
+		if (distanceFlag == BELOW_THRESHHOLD && distance < DISTANCE_THRESHHOLD)
+			return 0;
+	}
+
+	sei(); // enables interrupts
+	
+	if (distanceFlag == ABOVE_THRESHHOLD)
+		*distanceFlag = BELOW_THRESHHOLD;
+	else
+		*distanceFlag = ABOVE_THRESHHOLD;
+
+	return 1;
+}
+
+*/
