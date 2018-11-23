@@ -26,22 +26,25 @@ R2_VIDEO_PORT		= 8003
 R2_COMMAND_PORT		= 8004
 R2_COUNT_PORT		= 8005
 
+IP_LOCATION_PORT	= 8007
+
 NET_ADAPTER = 'wlp3s0'
 
 
 # Sends commands to the robot
 class RobotCommandWorker(QThread):
 	sig = pyqtSignal(str)
-	command_queue = queue.Queue()  # need some kind of queue. can this one work? https://docs.python.org/3/library/queue.html
 	
 	def __init__(self, context, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
+		self.command_queue = queue.Queue()
 		self.car_count = 0
 		self.robot_name = robot_name
 		
 		# setup command socket
 		self.command_socket = context.socket(zmq.REP)
 		self.command_socket.bind("tcp://" + str(address) + ':' + str(port))
+		print(self.robot_name + " RobotCommandWorker started")
 		
 	# when the robot needs to perform a command. add that command to the queue
 	def add_command(self, command):
@@ -133,9 +136,35 @@ class FrameReaderWorker(QThread):
 			connection.close()
 			self.server_socket.close()
 
+
+# Thread runs in the background waiting for connection from the robots
+class IPLocationWorker(QThread):
+	def __init__(self, server_address, ip_find_port):
+		super(QThread, self).__init__()
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		print("starting ip location service on" + server_address)
+		self.sock.bind((server_address, int(ip_find_port)))
+		self.sock.listen(1)
+		
+	def run(self):
+		print("listening for connection from robots")
+		count = 0
+		while count < 2:
+			connection, client_address = self.sock.accept()
+			try:
+				print ('connection from', client_address)
+				count += count + 1
+			finally:
+				print("connection closed")
+				connection.close()
+
+		self.sock.close()
+		print("socket closed")
+
+
 # RobotControl is a widget that controls a single robot		
 class RobotControl(QWidget):
-	def __init__(self, robot_name, context, ip_find_port, server_address, video_port, command_port, count_port):
+	def __init__(self, robot_name, context, server_address, video_port, command_port, count_port):
 		QWidget.__init__(self)
 		self.robot_name = robot_name
 		self.server_address = server_address
@@ -155,26 +184,6 @@ class RobotControl(QWidget):
 		# TODO resize pic so we don't need to scale it
 		self.slow_pic = self.slow_pic.scaled(50,50,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
 		self.create_widget()
-
-		#IP 
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		print(robot_name + "starting up on" + server_address)
-		sock.bind((server_address, ip_find_port))
-		sock.listen(0)
-		print("listening")
-		connection, client_address = sock.accept()
-		#print ('connection from', client_address)
-
-		try:
-			# show who connected to us
-			print ('connection from', client_address)
-		finally:
-			print("connection closed")
-			connection.close()
-			
-		
-		sock.close()
-		print("socket closed")
 
 
 
@@ -240,7 +249,7 @@ class RobotControl(QWidget):
 		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
 
 	def on_update_status(self, car_count, emergency_flag):
-		print('car count is ' + car_count)
+		#print('car count is ' + car_count)
 		self.car_count_label.setText(str(car_count))
 		if (emergency_flag == '1'): #True
 			self.on_emergency_approach()
@@ -249,6 +258,7 @@ class RobotControl(QWidget):
 
 	def on_updated_frame(self):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
+
 	def on_emergency_approach(self):
 		#TODO just to test the function and change the color when emergency vehicle is approaching
 		           #need to be adjusted
@@ -263,11 +273,12 @@ class RobotControl(QWidget):
 
 	# tells the robot to switch its sign from slow or stop
 	def switch_sign(self):
+		print(self.robot_name + " Change sign")
 		if (self.sign_slow == True):
 			print ("Controller sent STOP signal")
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_STOP)
 			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_STOP)
-			self.slow_stop_button.setText("Robot1: Swap to SLOW")
+			self.slow_stop_button.setText("Set to SLOW")
 			self.slow_stop_button.setStyleSheet("color: orange")
 			self.sign_pos_label.setPixmap(self.stop_pic)
 			self.cbox.setCurrentIndex(0)
@@ -277,7 +288,7 @@ class RobotControl(QWidget):
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_SLOW)
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_RESET_COUNT)
 			self.robot_command_worker.add_command(robotcommands.CMD_DISPLAY_PROCEED)
-			self.slow_stop_button.setText("Robot1: Swap to STOP")
+			self.slow_stop_button.setText("Set to STOP")
 			self.slow_stop_button.setCheckable(True)
 			self.slow_stop_button.setStyleSheet("color: red")
 			self.sign_pos_label.setPixmap(self.slow_pic)
@@ -316,12 +327,15 @@ class MainWindow(QWidget):
 		# create TCP/IP socket
 		context = zmq.Context()
 
-		r1 = RobotControl('Robot1', context, 8007, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		#r2 = RobotControl('Robot2', context, 8006, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		location_service = IPLocationWorker(server_address, IP_LOCATION_PORT)
+		location_service.start()
+
+		r1 = RobotControl('Robot1', context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		r2 = RobotControl('Robot2', context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		layout = QHBoxLayout(self)
 		layout.addWidget(r1)
-		#layout.addWidget(r2)
+		layout.addWidget(r2)
 
 		self.show()
 

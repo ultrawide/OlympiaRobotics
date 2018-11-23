@@ -42,7 +42,7 @@ def test_socket(ip, port):
     
     socket_obj = socket.socket() #socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     socket_obj.settimeout(0.1)
-    result = socket_obj.connect_ex((ip,port))
+    result = socket_obj.connect_ex((ip,int(port)))
     socket_obj.close()
     if (result != 0):
         print("Did not connect succesfully")
