@@ -1,3 +1,6 @@
+# If the power button is being held down for more than 5 seconds, shut down the system.
+# Issue: we need to perform a software shutdown for the pi before shutting down the system.
+
 import RPi.GPIO as GPIO
 import time
 
@@ -21,9 +24,9 @@ while True:
         startTimerFlag = True
     elif (GPIO.input(40) == 1):
         startTimerFlag = False
-    elif ((end - start) >= 5):
+    elif (startTimerFlag == False and (end - start) >= 5):
         GPIO.output(38, GPIO.HIGH)
-        print("Please power off :)")
+        print("Powering off system")
 
     end = time.time()
     print(end - start)
