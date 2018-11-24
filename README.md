@@ -1,13 +1,16 @@
 # OlympiaRobotics
 This repository contains the code and documentation needed for the develoment of RoboFlagger.
 
+<strong>Summary</strong>
+
 RoboFlagger is a two robot system that can be operated in a manual mode to control the two robots or autonomously.
 The three main software pieces required to run RoboFlagger are:
   client.py which should be ran on the raspberry pi
   gui.py which acts as the master controller for the raspberry pi
   sketch_robot.ino which controls the peripherals that roboflagger is equipped with
 
-<strong>bold Git Workflow</strong>
+<strong>Git Workflow</strong>
+
 To start a new branch and work locally on your own machine:
   1. git checkout -b "name of your branch"
   2. make changes to the branch
