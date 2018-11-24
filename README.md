@@ -3,11 +3,11 @@ This repository contains the code and documentation needed for the develoment of
 
 <strong>Summary</strong>
 
-RoboFlagger is a two robot system that can be operated in manually or autonomously.
+RoboFlagger is a two robot system that can be operated manually or autonomously.
 The three main software pieces required to run RoboFlagger are:
 <ul>
-  <li>client.py which should be ran on the raspberry pi</li>
-  <li>gui.py which acts as the master controller for the raspberry pi</li>
+  <li>client.py which should be ran on the raspberry pi. This processes commands issued by the controller (gui.py)</li>
+  <li>gui.py which acts as the master controller for the raspberry pis</li>
   <li>sketch_robot.ino which controls the peripherals that roboflagger is equipped with</li>
 </ul>
 
