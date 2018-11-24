@@ -28,8 +28,10 @@ R2_COUNT_PORT		= 8005
 
 IP_LOCATION_PORT	= 8007
 
-NET_ADAPTER = 'wlp3s0'
+NET_ADAPTER = 'wlp2s0'
 
+# added to lock the buttons when one is at slow
+ButtonLock = {"button":False, "CarCount":False}
 
 # Sends commands to the robot
 class RobotCommandWorker(QThread):
@@ -174,7 +176,12 @@ class RobotControl(QWidget):
 		self.emergency_vehicle = True
 		self.sign_slow = False
 		self.video_frame_file = robot_name + '_video.jpg'
+		self.count_port = count_port
 		self.context = context
+
+		#added for automated mode
+		self.carCount = 0
+		self.emergencyFlag = None
 
 		# load graphics for sign_pos_label
 		self.stop_pic = QPixmap('Stop.png')
@@ -250,6 +257,10 @@ class RobotControl(QWidget):
 
 	def on_update_status(self, car_count, emergency_flag):
 		#print('car count is ' + car_count)
+		#added for automated mode
+		self.carCount = car_count
+		self.emergencyFlag = emergency_flag
+		#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		self.car_count_label.setText(str(car_count))
 		if (emergency_flag == '1'): #True
 			self.on_emergency_approach()
@@ -271,6 +282,7 @@ class RobotControl(QWidget):
 		self.emergency_ans_label.setStyleSheet('color: black')
 		self.emergency_ans_label.setText("None")
 
+
 	# tells the robot to switch its sign from slow or stop
 	def switch_sign(self):
 		print(self.robot_name + " Change sign")
@@ -283,7 +295,10 @@ class RobotControl(QWidget):
 			self.sign_pos_label.setPixmap(self.stop_pic)
 			self.cbox.setCurrentIndex(0)
 			self.sign_slow = False
-		else:
+			# added to unlock the buttons when one is at slow
+			ButtonLock["button"] = False
+		#changed else to elif to lock the buttons when one is at slow
+		elif(self.sign_slow == False and not ButtonLock["button"]):
 			print ("Controller sent SLOW signal")
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_SLOW)
 			self.robot_command_worker.add_command(robotcommands.CMD_ROBOT_RESET_COUNT)
@@ -294,6 +309,15 @@ class RobotControl(QWidget):
 			self.sign_pos_label.setPixmap(self.slow_pic)
 			self.cbox.setCurrentIndex(1)
 			self.sign_slow = True
+			# added to lock the buttons when one is at slow
+			ButtonLock["button"] = True
+		#message box pops up when operator tries to have both robots 			showing the slow signs
+		else:
+			self.msg = QMessageBox()
+			self.msg.setIcon(QMessageBox.Information)
+			self.msg.setText("Error:")
+			self.msg.setDetailedText("You cannot have both robots showing the slow sign!")
+			retval = self.msg.exec_()
 			
 	def switch_signboard(self,index):
 		if (index == 0):
@@ -313,6 +337,111 @@ class RobotControl(QWidget):
 		
 	def reset_emergency_flag(self):
 		self.robot_command_worker.add_command(robotcommands.CMD_RESET_EMERGENCY)
+	
+	#added for automated mode
+	def SetSignStatus(self,status):
+		self.sign_slow = status
+	#added for automated mode
+	def GetSignStatus(self):
+		return self.sign_slow
+	def ReturnCarCount(self):
+		return self.carCount
+	def ReturnemergencyFlag(self):
+		return self.emergencyFlag
+
+#Automated mode class, run in separate thread, right now has a dumb changing sign just to check the gui
+#It uses the RobotControl functions to show the decisioning
+#It also pop up a second window which is supposed to show the decision/messages of the robots
+class AutomatedMode(QThread):
+	def __init__(self, r1,r2):
+		super(QThread, self).__init__()
+		self.r1 = r1
+		self.r2 = r2
+		self.counter = True
+		self.r1SlowSign = False
+		self.r2SlowSign = False
+	def run(self):
+		#getting sign status before changing them
+		#the decisioning here is a dumb one, need to be changed
+		self.r1SlowSign = self.r1.GetSignStatus()
+		self.r2SlowSign = self.r2.GetSignStatus()
+		self.r1CarCount = self.r1.ReturnCarCount()
+		self.r2CarCount = self.r2.ReturnCarCount()
+		self.r1emergencyFlag = self.r1.ReturnemergencyFlag()
+		self.r2emergencyFlag = self.r2.ReturnemergencyFlag()
+		print("car count of robot1 " + str(self.r1CarCount))
+		print("car count of robot2 " + str(self.r2CarCount))
+		#print("Emergency Flag of robot1 " + self.r1emergencyFlag)
+		#print("Emergency Flag of robot2 " + self.r2emergencyFlag)
+		self.count = 5
+		self.time = QTimer()
+		while self.counter:
+			if (self.r1SlowSign == True):
+				print ("Controller sent STOP signal")
+				self.r1.SetSignStatus(True)
+				self.r2.SetSignStatus(True)
+				#uses robots control function just like assuming the button is pressed
+				self.r1.switch_sign()
+				self.r2.switch_sign()
+			elif(self.r1SlowSign == False):
+				print ("Controller sent SLOW signal")
+				self.r1.SetSignStatus(False)
+				# uses robots control function just like assuming the button is pressed
+				self.r1.switch_sign()
+				self.r2.SetSignStatus(True)
+				# uses robots control function just like assuming the button is pressed
+				self.r2.switch_sign()
+			self.counter = False
+			"""self.time.setInterval(3000)
+			self.time.setSingleShot(True)
+			self.time.timeout.connect(self.StartCounter)
+			
+	def StartCounter(self):
+		self.count = self.count - 1"""
+#processing window for automated mode
+#runs on a separate thread
+#has settings to change the number of cars allowed to pass
+#messages from robot decisioning need to be added
+class ProcesssingWindow(QMainWindow,QThread):
+	def __init__(self):
+		#super(ProcesssingWindow, self).__init__(None)
+		super(QThread, self).__init__()
+		self.left = 500
+		self.top = 500
+		self.width = 840
+		self.height = 480
+		#setting or menu bar
+		bar = self.menuBar()
+		file = bar.addMenu("Settings")
+		ActionGroup = QActionGroup(bar,exclusive=True)
+		Action = ActionGroup.addAction(QAction("5 cars each turn",bar,checkable=True))
+		file.addAction(Action)
+		Action =ActionGroup.addAction(QAction("10 cars each turn", bar, checkable=True))
+		file.addAction(Action)
+		Action =ActionGroup.addAction(QAction("15 cars each turn", bar, checkable=True))
+		file.addAction(Action)
+		ActionGroup.triggered[QAction].connect(self.processtrigger)
+		self.text = QTextEdit()
+		self.setCentralWidget(self.text)
+		self.statusBar = QStatusBar()
+		self.setWindowTitle("Automated Processing")
+		self.setGeometry(self.left, self.top, self.width, self.height)
+		self.setStatusBar(self.statusBar)
+		#function when the number of cars allowed to pass changes by the operator
+	#need to add the change in car count
+	def processtrigger(self, q):
+		if (q.text() == "5 cars each turn"):
+			self.statusBar.showMessage("5 cars each turn is alowed to pass")
+			self.text.append("Changing number of cars allowed to pass to 5")
+		if q.text() == "10 cars each turn":
+			self.statusBar.showMessage("10 cars each turn is alowed to pass")
+			self.text.append("Changing number of cars allowed to pass to 10")
+		if q.text() == "15 cars each turn":
+			self.statusBar.showMessage("15 cars each turn is alowed to pass")
+			self.text.append("Changing number of cars allowed to pass to 15")
+	def closeEvent(self, event):
+		print("Closing Automated processing window")
+
 
 # Main application GUI
 class MainWindow(QWidget):
@@ -320,6 +449,7 @@ class MainWindow(QWidget):
 	def __init__(self, net_adapter):
 		QWidget.__init__(self)
 
+		self.manual = True
 		# get my ip stuff here
 		server_address = robo_library.get_ip()
 		print("Controller IP Address Found: " + server_address)
@@ -330,16 +460,44 @@ class MainWindow(QWidget):
 		location_service = IPLocationWorker(server_address, IP_LOCATION_PORT)
 		location_service.start()
 
-		r1 = RobotControl('Robot1', context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		r2 = RobotControl('Robot2', context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
-
-		layout = QHBoxLayout(self)
-		layout.addWidget(r1)
-		layout.addWidget(r2)
+		self.r1 = RobotControl('Robot1', context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		self.r2 = RobotControl('Robot2', context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		
+		# codes added for automated mode:
+		layout = QGridLayout(self)
+		#button for switching between manual and automated mode
+		self.Manual_Auto_button = QPushButton('Manual')
+		self.Manual_Auto_button.clicked.connect(self.switch_mode)
+		layout.addWidget(self.Manual_Auto_button, 0,0)
+		self.myProcesssingWindow = ProcesssingWindow()
+		
+		layout.addWidget(self.r1,1,0)
+		layout.addWidget(self.r2,1,1)
 
 		self.show()
 
-
+#function for switching between manual and automated mode
+	def switch_mode(self):
+		if self.manual:
+			print("switch mode to automated")
+			self.Manual_Auto_button.setText("Automated")
+			self.Manual_Auto_button.setStyleSheet('color: green')
+			self.manual = False
+			#message box, but it disables the robot control
+			#self.msg = QMessageBox()
+			#self.msg.setIcon(QMessageBox.Information)
+			#self.msg.setText("Automated mode processing:")
+			#self.msg.setDetailedText("The details are as follows:")
+			#retval = self.msg.exec_()
+			self.myProcesssingWindow.show()
+			self.auto = AutomatedMode(self.r1,self.r2)
+			self.auto.run()
+		else:
+			print("switch mode to manual")
+			self.Manual_Auto_button.setText("Manual")
+			self.Manual_Auto_button.setStyleSheet('color: black')
+			self.manual = True
+			self.myProcesssingWindow.close()
 
 #Main 
 if __name__ == '__main__':
