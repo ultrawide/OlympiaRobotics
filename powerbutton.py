@@ -24,7 +24,7 @@ while True:
         startTimerFlag = True
     elif (GPIO.input(40) == 1):
         startTimerFlag = False
-    elif (startTimerFlag == False and (end - start) >= 5):
+    elif (startTimerFlag == True and (end - start) >= 5):
         GPIO.output(38, GPIO.HIGH)
         print("Powering off system")
 
