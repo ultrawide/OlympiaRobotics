@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 // DEBUG
-#define DEBUG 0 // set DEBUG 0 to turn off print statements
+#define DEBUG 1 // set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -53,6 +53,13 @@ int LEDPIN = 3;
 // IR Sensor Variables
 int isEmergency = 0;
 
+
+//Disabling Interrupts 
+int A_TO_P = 50; // This connects to 35 Arduino to Pi (output)
+int P_TO_A = 52; //This connects to 37 Pi to Arduino (input)
+
+
+
 void setup() {
   if (DEBUG == 1)
   {
@@ -82,6 +89,10 @@ void setup() {
   matrix.setTextWrap(true); 
 
   matrix.setCursor(8, 0); // start at top left, with 8 pixel of spacing
+
+  // Disabling Interrupts //
+  pinMode(P_TO_A, INPUT);      
+  pinMode(A_TO_P, OUTPUT); 
 }
 
 
@@ -185,7 +196,17 @@ void sendData(){
 
 void Car_Count()
 {
+  while (digitalRead(P_TO_A) == HIGH)
+  {
+    Serial.println("Pi telling me to not disable interrupts");
+    //Don't disable interrupts
+    
+  }
+  digitalWrite(A_TO_P, HIGH);
+  
   cli(); // disables interrupts
+  Serial.println("Disabled Interrupts");
+  
   digitalWrite(TRIGPIN, LOW);
   delayMicroseconds(2);
  
@@ -196,6 +217,8 @@ void Car_Count()
   // Reads the echoPin, returns the sound wave travel time in microseconds
   duration = pulseIn(ECHOPIN, HIGH);
   sei(); // enables interrupts
+  digitalWrite(A_TO_P,LOW);
+  Serial.println("Enabled Interrupts");
 
   // Calculating the distance
   distance = duration*0.034/2;
