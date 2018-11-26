@@ -13,6 +13,7 @@ import time
 import queue
 import robotcommands
 import robo_library
+from threading import Thread, Lock
 
 # CONSTANTS
 VIDEO_WIDTH		= 640
@@ -453,6 +454,11 @@ class MainWindow(QWidget):
 		# get my ip stuff here
 		server_address = robo_library.get_ip()
 		print("Controller IP Address Found: " + server_address)
+
+		self.lock = Lock()
+		self.r1_count = 0
+		self.r2_count = 0
+		self.total_count = 0
 		
 		# create TCP/IP socket
 		context = zmq.Context()
@@ -462,17 +468,33 @@ class MainWindow(QWidget):
 
 		self.r1 = RobotControl('Robot1', context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
 		self.r2 = RobotControl('Robot2', context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+
+		# Total Count of cars moving between robots
+		#count_layout = QHBoxLayout()
+		#layout.addLayout(count_layout)
+		label = QLabel("Cars moving between robots:")
+		#label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+		self.total_count_label = QLabel('0')
 		
-		# codes added for automated mode:
-		layout = QGridLayout(self)
+		#self.total_count_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+		
+		
+		vlayout = QVBoxLayout(self)
+		robot_layout = QHBoxLayout(self)
+		count_layout = QHBoxLayout(self)
+		vlayout.addLayout(count_layout)
+		vlayout.addLayout(robot_layout)
 		#button for switching between manual and automated mode
 		self.Manual_Auto_button = QPushButton('Manual')
 		self.Manual_Auto_button.clicked.connect(self.switch_mode)
-		layout.addWidget(self.Manual_Auto_button, 0,0)
+		count_layout.addWidget(self.Manual_Auto_button)		
+		count_layout.addWidget(label)
+		count_layout.addWidget(self.total_count_label)
 		self.myProcesssingWindow = ProcesssingWindow()
 		
-		layout.addWidget(self.r1,1,0)
-		layout.addWidget(self.r2,1,1)
+		robot_layout.addWidget(self.r1)
+		robot_layout.addWidget(self.r2)
+
 
 		self.show()
 
@@ -498,6 +520,20 @@ class MainWindow(QWidget):
 			self.Manual_Auto_button.setStyleSheet('color: black')
 			self.manual = True
 			self.myProcesssingWindow.close()
+
+	def on_update_status(self, robot, car_count, emergency_flag):
+		if robot == ROBOT1_NAME:
+			self.r1_count = int(car_count)
+			self.r1_emergency_flag = bool(emergency_flag)
+		else:
+			self.r2_count = int(car_count)
+			self.r2_emergency_flag = bool(emergency_flag)
+		
+		self.lock.acquire()
+		self.total_count = abs(self.r1_count - self.r2_count)
+		self.lock.release()
+		self.total_count_label.setText(str(self.total_count))
+
 
 #Main 
 if __name__ == '__main__':
