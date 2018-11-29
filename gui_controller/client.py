@@ -232,7 +232,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
 					prevCarCount = 0
 					GPIO.output(37, GPIO.LOW)
-		    			lock.release()
+						lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("Car count reset to zero")
@@ -347,41 +347,41 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 # - send the emergency vehicle flag from adruino to controller anlong with
 #   the carcount.
 def publish_robot_status(socket, i2c_enabled, bus):
-        global prevCarCount
-        global prevEmergencyFlag
+	global prevCarCount
+	global prevEmergencyFlag
 	try:
 		while True:
 			print("Publishing car count from arduino")
 			lock.acquire()
-                        try:
-							# TODO: lock ( any time we access the arduino we need to make sure that the process_command thread
-							# is also not accessing the arduino.  Use some synchronization every time we access the communicate
-							# with the arduino
-							while (GPIO.input(35) == 1):
-									print("arduino has interrupts disbaled")
-									time.sleep(.01)
-									continue
-							GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
+			try:
+				# TODO: lock ( any time we access the arduino we need to make sure that the process_command thread
+				# is also not accessing the arduino.  Use some synchronization every time we access the communicate
+				# with the arduino
+				while (GPIO.input(35) == 1):
+						print("arduino has interrupts disbaled")
+						time.sleep(.01)
+						continue
+				GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 
-							writeNumber(bus,ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_COUNT))
-							time.sleep(ARDUINO_I2C_RESPONSE_TIME)
-							carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
-							prevCarCount = carCount
-							print("From Arduino, I received car count: ", carCount)
-							time.sleep(ARDUINO_I2C_RESPONSE_TIME)
-							writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
-							time.sleep(ARDUINO_I2C_RESPONSE_TIME)
-							emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
-							prevEmergencyFlag = emergencyFlag
-							GPIO.output(37, GPIO.LOW)
-                            # TODO: also grab the emergency vehicle flag status from the arduino
-                            # TODO: publish to the emergency vehicle flag status along with car count
-                        except IOError as e:
-                            print(e)
+				writeNumber(bus,ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_COUNT))
+				time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+				carCount = readNumber(bus,ARDUINO_I2C_ADDRESS)
+				prevCarCount = carCount
+				print("From Arduino, I received car count: ", carCount)
+				time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+				writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_EMERGENCY_FLAG))
+				time.sleep(ARDUINO_I2C_RESPONSE_TIME)
+				emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
+				prevEmergencyFlag = emergencyFlag
+				GPIO.output(37, GPIO.LOW)
+				# TODO: also grab the emergency vehicle flag status from the arduino
+				# TODO: publish to the emergency vehicle flag status along with car count
+			except IOError as e:
+				print(e)
 			
 			GPIO.output(37, GPIO.LOW)
-                        carCount = prevCarCount
-                        emergencyFlag = prevEmergencyFlag    
+			carCount = prevCarCount
+			emergencyFlag = prevEmergencyFlag    
 			publisher.send_multipart([robot_name.encode('utf-8'),str(carCount).encode('utf-8'), str(emergencyFlag).encode('utf-8')])
 			lock.release()
 			time.sleep(STATUS_UPDATE_DELAY)	
@@ -411,7 +411,7 @@ if __name__ == "__main__":
 	setup_pi_gpio()
 
 	ip_result = False
-        ip_number = 0
+	ip_number = 0
 	connect_attempts = 0
 	controller_ip = ""
 	location_port = rc.get_option_str(rc.IP_LOCATION_PORT_CFG)
