@@ -232,7 +232,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					count = readNumber(bus, ARDUINO_I2C_ADDRESS)
 					prevCarCount = 0
 					GPIO.output(37, GPIO.LOW)
-						lock.release()
+					lock.release()
 				else:
 					print("i2c disabled")
 				socket.send_string("Car count reset to zero")
