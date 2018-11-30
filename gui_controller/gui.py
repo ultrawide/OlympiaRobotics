@@ -16,6 +16,9 @@ import robo_library
 from threading import Thread, Lock
 
 # CONSTANTS
+ROBOT1_NAME	= "Robot1"
+ROBOT2_NAME = "Robot2"
+
 VIDEO_WIDTH		= 640
 VIDEO_HEIGHT		= 480
 
@@ -261,7 +264,7 @@ class RobotControl(QWidget):
 		#added for automated mode
 		self.carCount = car_count
 		self.emergencyFlag = emergency_flag
-		#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 		self.car_count_label.setText(str(car_count))
 		if (emergency_flag == '1'): #True
 			self.on_emergency_approach()
@@ -272,8 +275,6 @@ class RobotControl(QWidget):
 		self.video_label.setPixmap(QPixmap(self.video_frame_file))
 
 	def on_emergency_approach(self):
-		#TODO just to test the function and change the color when emergency vehicle is approaching
-		           #need to be adjusted
 		self.emergency_desc_label.setStyleSheet('color: red')
 		self.emergency_ans_label.setStyleSheet('color: red')
 		self.emergency_ans_label.setText("Aproaching")
@@ -393,12 +394,7 @@ class AutomatedMode(QThread):
 				# uses robots control function just like assuming the button is pressed
 				self.r2.switch_sign()
 			self.counter = False
-			"""self.time.setInterval(3000)
-			self.time.setSingleShot(True)
-			self.time.timeout.connect(self.StartCounter)
-			
-	def StartCounter(self):
-		self.count = self.count - 1"""
+
 #processing window for automated mode
 #runs on a separate thread
 #has settings to change the number of cars allowed to pass
@@ -443,6 +439,28 @@ class ProcesssingWindow(QMainWindow,QThread):
 	def closeEvent(self, event):
 		print("Closing Automated processing window")
 
+class AdvancedCarCount(QWidget):
+	def __init__(self):
+		self.CAR_W = 50
+		self.CAR_H = 50
+
+		QWidget.__init__(self)
+		#self.setGeometry(0,0,300,100)
+		self.car_pic = QPixmap("car.jpg")
+		self.car_pic = self.car_pic.scaled(self.CAR_W, self.CAR_H,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
+		self.num_cars = 0
+		
+	def paintEvent(self, event):
+		painter = QPainter(self)
+		car_pixmap = QPixmap("car.jpg")
+
+		painter.drawText(QRectF(0.0,0.0,50.0,50.0), Qt.AlignCenter|Qt.AlignTop, str(self.num_cars))
+
+		i = 0
+		while i < self.num_cars:
+			painter.drawPixmap(50 + (self.CAR_W * i), 50, self.CAR_W, self.CAR_H, self.car_pic)
+			i = i + 1
+
 
 # Main application GUI
 class MainWindow(QWidget):
@@ -466,8 +484,8 @@ class MainWindow(QWidget):
 		location_service = IPLocationWorker(server_address, IP_LOCATION_PORT)
 		location_service.start()
 
-		self.r1 = RobotControl('Robot1', context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
-		self.r2 = RobotControl('Robot2', context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
+		self.r1 = RobotControl(ROBOT1_NAME, context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
+		self.r2 = RobotControl(ROBOT2_NAME, context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
 
 		# Total Count of cars moving between robots
 		#count_layout = QHBoxLayout()
@@ -478,32 +496,35 @@ class MainWindow(QWidget):
 		
 		#self.total_count_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 		
-		
 		vlayout = QVBoxLayout(self)
-		robot_layout = QHBoxLayout(self)
-		count_layout = QHBoxLayout(self)
-		vlayout.addLayout(count_layout)
-		vlayout.addLayout(robot_layout)
-		#button for switching between manual and automated mode
-		self.Manual_Auto_button = QPushButton('Manual')
+
+		# Auto/Manual Button and Count Layout
+		count_layout = QVBoxLayout()
+		self.Manual_Auto_button = QPushButton('Automated')
 		self.Manual_Auto_button.clicked.connect(self.switch_mode)
 		count_layout.addWidget(self.Manual_Auto_button)		
-		count_layout.addWidget(label)
-		count_layout.addWidget(self.total_count_label)
+		self.advanced_carcount = AdvancedCarCount()
+		self.advanced_carcount.setMinimumSize(300,100)
+		count_layout.addWidget(self.advanced_carcount)
 		self.myProcesssingWindow = ProcesssingWindow()
 		
+		robot_layout = QHBoxLayout()
 		robot_layout.addWidget(self.r1)
 		robot_layout.addWidget(self.r2)
 
+		vlayout.addLayout(count_layout)
+		vlayout.addLayout(robot_layout)
 
 		self.show()
 
 #function for switching between manual and automated mode
 	def switch_mode(self):
+		self.advanced_carcount.num_cars = self.advanced_carcount.num_cars + 1
+		self.on_update_status("robot1", self.advanced_carcount.num_cars, 0)
 		if self.manual:
 			print("switch mode to automated")
-			self.Manual_Auto_button.setText("Automated")
-			self.Manual_Auto_button.setStyleSheet('color: green')
+			self.Manual_Auto_button.setText("Manual")
+			self.Manual_Auto_button.setStyleSheet('color: black')
 			self.manual = False
 			#message box, but it disables the robot control
 			#self.msg = QMessageBox()
@@ -516,8 +537,8 @@ class MainWindow(QWidget):
 			self.auto.run()
 		else:
 			print("switch mode to manual")
-			self.Manual_Auto_button.setText("Manual")
-			self.Manual_Auto_button.setStyleSheet('color: black')
+			self.Manual_Auto_button.setText("Automated")
+			self.Manual_Auto_button.setStyleSheet('color: green')
 			self.manual = True
 			self.myProcesssingWindow.close()
 
@@ -532,7 +553,8 @@ class MainWindow(QWidget):
 		self.lock.acquire()
 		self.total_count = abs(self.r1_count - self.r2_count)
 		self.lock.release()
-		self.total_count_label.setText(str(self.total_count))
+		self.advanced_carcount.num_cars = self.total_count
+		self.advanced_carcount.update()
 
 
 #Main 
