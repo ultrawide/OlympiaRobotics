@@ -100,14 +100,14 @@ void loop() {
   curTime = millis();
   
   if (curTime >= irTime){
-    IR_Detector();
-    irTime = millis() + 300;
+    //IR_Detector();
+    //irTime = millis() + 300;
   }
 
   curTime = millis();
   if (curTime >= carCountTime){
     Car_Count();
-    carCountTime = millis() + 150;  
+    carCountTime = millis() + 100;  
   }
 }
 
@@ -194,6 +194,10 @@ void sendData(){
   }
 }
 
+#define NUM_PREV_READINGS 3
+int distances[NUM_PREV_READINGS] = {0, 0, 0};
+int distancesIndex = 0;
+
 void Car_Count()
 {
   while (digitalRead(P_TO_A) == HIGH)
@@ -222,9 +226,23 @@ void Car_Count()
 
   // Calculating the distance
   distance = duration*0.034/2;
+  distances[distancesIndex % NUM_PREV_READINGS] = distance;
+  distancesIndex = (distancesIndex + 1) % NUM_PREV_READINGS;
+  Serial.print("index 0: ");
+  Serial.println(distances[0]);
+  Serial.print("index 1: ");
+  Serial.println(distances[1]);
+  Serial.print("index 2: ");
+  Serial.println(distances[2]);
   
-  if (distance <= 150 && distance >= 0 && enableCount)
+  if (distances[(distancesIndex-1)%NUM_PREV_READINGS] <= 150 && 
+      distances[(distancesIndex-2)%NUM_PREV_READINGS] <= 150 &&
+      distance <= 150 &&
+      distance >= 0 && enableCount)
   {
+    distances[0] = 500;
+    distances[1] = 500;
+    distances[2] = 500;
     enableCount = false;
     carCount += 1;
   }
