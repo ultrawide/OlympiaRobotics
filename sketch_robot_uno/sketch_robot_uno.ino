@@ -55,8 +55,8 @@ int isEmergency = 0;
 
 
 //Disabling Interrupts 
-int A_TO_P = 50; // This connects to 35 Arduino to Pi (output)
-int P_TO_A = 52; //This connects to 37 Pi to Arduino (input)
+int A_TO_P = 7; // This connects to 35 Arduino to Pi (output)
+int P_TO_A = 8; //This connects to 37 Pi to Arduino (input)
 
 
 
