@@ -19,8 +19,8 @@ from threading import Thread, Lock
 ROBOT1_NAME	= "Robot1"
 ROBOT2_NAME = "Robot2"
 
-VIDEO_WIDTH		= 640
-VIDEO_HEIGHT		= 480
+VIDEO_WIDTH		= 320
+VIDEO_HEIGHT		= 240
 
 R1_VIDEO_PORT		= 8000
 R1_COMMAND_PORT		= 8001
@@ -50,7 +50,7 @@ class RobotCommandWorker(QThread):
 		# setup command socket
 		self.command_socket = context.socket(zmq.REP)
 		self.command_socket.bind("tcp://" + str(address) + ':' + str(port))
-		print(self.robot_name + " RobotCommandWorker started")
+		#print(self.robot_name + " RobotCommandWorker started")
 		
 	# when the robot needs to perform a command. add that command to the queue
 	def add_command(self, command):
@@ -81,7 +81,7 @@ class RobotCommandWorker(QThread):
 # current number of cars that have travelled passed the robot.  It also gets the emergency
 # vehicle approaching flag from the robot.
 class RobotStatusWorker(QThread):
-	sig = pyqtSignal(str,str)
+	sig = pyqtSignal(str, str,str)
 
 	def __init__(self, context, address, port, robot_name, parent=None):
 		super(QThread, self).__init__()
@@ -92,6 +92,7 @@ class RobotStatusWorker(QThread):
 	
 	def run(self):
 		print(self.robot_name + ' Car Counting Thread Started')
+		#self.sig.emit(str(self.robot_name), str(0), str(0))
 		try:
 			self.running = True
 			while self.running:
@@ -100,7 +101,7 @@ class RobotStatusWorker(QThread):
 				emergency_flag = emergency_flag.decode('utf-8')
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
-				self.sig.emit(str(car_count), str(emergency_flag))			
+				self.sig.emit(str(self.robot_name), str(car_count), str(emergency_flag))			
 				time.sleep(.25)
 		finally:
 			print(self.robot_name + 'Car Thread done')
@@ -259,7 +260,7 @@ class RobotControl(QWidget):
 		self.reset_emergency_button.clicked.connect(self.on_emergency_not_approach)
 		self.reset_emergency_button.clicked.connect(self.reset_emergency_flag)
 
-	def on_update_status(self, car_count, emergency_flag):
+	def on_update_status(self, robot_name, car_count, emergency_flag):
 		#print('car count is ' + car_count)
 		#added for automated mode
 		self.carCount = car_count
@@ -283,7 +284,6 @@ class RobotControl(QWidget):
 		self.emergency_desc_label.setStyleSheet('color: black')
 		self.emergency_ans_label.setStyleSheet('color: black')
 		self.emergency_ans_label.setText("None")
-
 
 	# tells the robot to switch its sign from slow or stop
 	def switch_sign(self):
@@ -362,6 +362,7 @@ class AutomatedMode(QThread):
 		self.counter = True
 		self.r1SlowSign = False
 		self.r2SlowSign = False
+
 	def run(self):
 		#getting sign status before changing them
 		#the decisioning here is a dumb one, need to be changed
@@ -371,10 +372,12 @@ class AutomatedMode(QThread):
 		self.r2CarCount = self.r2.ReturnCarCount()
 		self.r1emergencyFlag = self.r1.ReturnemergencyFlag()
 		self.r2emergencyFlag = self.r2.ReturnemergencyFlag()
+
 		print("car count of robot1 " + str(self.r1CarCount))
 		print("car count of robot2 " + str(self.r2CarCount))
 		#print("Emergency Flag of robot1 " + self.r1emergencyFlag)
 		#print("Emergency Flag of robot2 " + self.r2emergencyFlag)
+
 		self.count = 5
 		self.time = QTimer()
 		while self.counter:
@@ -401,13 +404,13 @@ class AutomatedMode(QThread):
 #messages from robot decisioning need to be added
 class ProcesssingWindow(QMainWindow,QThread):
 	def __init__(self):
-		#super(ProcesssingWindow, self).__init__(None)
 		super(QThread, self).__init__()
-		self.left = 500
-		self.top = 500
-		self.width = 840
-		self.height = 480
-		#setting or menu bar
+		#self.left = 500
+		#self.top = 500
+		#self.width = 840
+		#self.height = 480
+
+		#Settings for MenuBar
 		bar = self.menuBar()
 		file = bar.addMenu("Settings")
 		ActionGroup = QActionGroup(bar,exclusive=True)
@@ -418,13 +421,17 @@ class ProcesssingWindow(QMainWindow,QThread):
 		Action =ActionGroup.addAction(QAction("15 cars each turn", bar, checkable=True))
 		file.addAction(Action)
 		ActionGroup.triggered[QAction].connect(self.processtrigger)
+
 		self.text = QTextEdit()
 		self.setCentralWidget(self.text)
 		self.statusBar = QStatusBar()
 		self.setWindowTitle("Automated Processing")
-		self.setGeometry(self.left, self.top, self.width, self.height)
+		self.setMinimumSize(840,480)
+		self.setMaximumSize(840,480)
+		#self.setGeometry(self.left, self.top, self.width, self.height)
 		self.setStatusBar(self.statusBar)
 		#function when the number of cars allowed to pass changes by the operator
+
 	#need to add the change in car count
 	def processtrigger(self, q):
 		if (q.text() == "5 cars each turn"):
@@ -445,7 +452,6 @@ class AdvancedCarCount(QWidget):
 		self.CAR_H = 50
 
 		QWidget.__init__(self)
-		#self.setGeometry(0,0,300,100)
 		self.car_pic = QPixmap("car.jpg")
 		self.car_pic = self.car_pic.scaled(self.CAR_W, self.CAR_H,Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
 		self.num_cars = 0
@@ -486,15 +492,8 @@ class MainWindow(QWidget):
 
 		self.r1 = RobotControl(ROBOT1_NAME, context, server_address, R1_VIDEO_PORT, R1_COMMAND_PORT, R1_COUNT_PORT)
 		self.r2 = RobotControl(ROBOT2_NAME, context, server_address, R2_VIDEO_PORT, R2_COMMAND_PORT, R2_COUNT_PORT)
-
-		# Total Count of cars moving between robots
-		#count_layout = QHBoxLayout()
-		#layout.addLayout(count_layout)
-		label = QLabel("Cars moving between robots:")
-		#label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-		self.total_count_label = QLabel('0')
-		
-		#self.total_count_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+		self.r1.robot_status_worker.sig.connect(self.on_update_status)
+		self.r2.robot_status_worker.sig.connect(self.on_update_status)
 		
 		vlayout = QVBoxLayout(self)
 
@@ -502,10 +501,13 @@ class MainWindow(QWidget):
 		count_layout = QVBoxLayout()
 		self.Manual_Auto_button = QPushButton('Automated')
 		self.Manual_Auto_button.clicked.connect(self.switch_mode)
-		count_layout.addWidget(self.Manual_Auto_button)		
+		count_layout.addWidget(self.Manual_Auto_button)
+		
 		self.advanced_carcount = AdvancedCarCount()
-		self.advanced_carcount.setMinimumSize(300,100)
+		self.advanced_carcount.setMinimumSize(1280,100)
+		self.advanced_carcount.setMaximumSize(1280,100)
 		count_layout.addWidget(self.advanced_carcount)
+
 		self.myProcesssingWindow = ProcesssingWindow()
 		
 		robot_layout = QHBoxLayout()
@@ -519,19 +521,19 @@ class MainWindow(QWidget):
 
 #function for switching between manual and automated mode
 	def switch_mode(self):
-		self.advanced_carcount.num_cars = self.advanced_carcount.num_cars + 1
-		self.on_update_status("robot1", self.advanced_carcount.num_cars, 0)
 		if self.manual:
-			print("switch mode to automated")
+			print("switching mode to automated")
 			self.Manual_Auto_button.setText("Manual")
 			self.Manual_Auto_button.setStyleSheet('color: black')
 			self.manual = False
+
 			#message box, but it disables the robot control
 			#self.msg = QMessageBox()
 			#self.msg.setIcon(QMessageBox.Information)
 			#self.msg.setText("Automated mode processing:")
 			#self.msg.setDetailedText("The details are as follows:")
 			#retval = self.msg.exec_()
+
 			self.myProcesssingWindow.show()
 			self.auto = AutomatedMode(self.r1,self.r2)
 			self.auto.run()
@@ -540,10 +542,11 @@ class MainWindow(QWidget):
 			self.Manual_Auto_button.setText("Automated")
 			self.Manual_Auto_button.setStyleSheet('color: green')
 			self.manual = True
-			self.myProcesssingWindow.close()
+			self.myProcesssingWindow.hide()
 
-	def on_update_status(self, robot, car_count, emergency_flag):
-		if robot == ROBOT1_NAME:
+
+	def on_update_status(self, robot_name, car_count, emergency_flag):
+		if robot_name == ROBOT1_NAME:
 			self.r1_count = int(car_count)
 			self.r1_emergency_flag = bool(emergency_flag)
 		else:

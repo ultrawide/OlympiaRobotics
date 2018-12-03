@@ -32,7 +32,7 @@ R2_COUNT_PORT		= 8005
 
 IP_LOCATION_PORT	= 8007
 
-NET_ADAPTER = 'wlp2s0'
+NET_ADAPTER = 'wlp3s0'
 
 # added to lock the buttons when one is at slow
 ButtonLock = {"button":False, "CarCountLock":True}
@@ -595,7 +595,7 @@ class MainWindow(QWidget):
 
 		self.manual = True
 		# get my ip stuff here
-		server_address = robo_library.get_ip()
+		server_address = robo_library.get_ip(NET_ADAPTER)
 		print("Controller IP Address Found: " + server_address)
 
 		self.lock = Lock()
