@@ -1,0 +1,6 @@
+
+Requires Python version 3.7
+
+Install Required Packages
+pip3.7 install --user zmq
+pip3.7 install --user pyqt5
