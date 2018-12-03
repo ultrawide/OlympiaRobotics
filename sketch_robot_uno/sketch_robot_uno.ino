@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 // DEBUG
-#define DEBUG 1 // set DEBUG 0 to turn off print statements
+#define DEBUG 0// set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -32,8 +32,8 @@ int RECEIVED_CMD = 0;
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 
 // Car Counting US Sensor PINS
-int ECHOPIN = 2;
-int TRIGPIN = 3;
+int ECHOPIN = 9;
+int TRIGPIN = 10;
 
 // CarCount Variables
 int distance = 0;
@@ -100,8 +100,8 @@ void loop() {
   curTime = millis();
   
   if (curTime >= irTime){
-    //IR_Detector();
-    //irTime = millis() + 300;
+    IR_Detector();
+    irTime = millis() + 300;
   }
 
   curTime = millis();
@@ -228,25 +228,24 @@ void Car_Count()
   distance = duration*0.034/2;
   distances[distancesIndex % NUM_PREV_READINGS] = distance;
   distancesIndex = (distancesIndex + 1) % NUM_PREV_READINGS;
-  Serial.print("index 0: ");
+  /*Serial.print("index 0: ");
   Serial.println(distances[0]);
   Serial.print("index 1: ");
   Serial.println(distances[1]);
   Serial.print("index 2: ");
   Serial.println(distances[2]);
-  
+  */
   if (distances[(distancesIndex-1)%NUM_PREV_READINGS] <= 150 && 
       distances[(distancesIndex-2)%NUM_PREV_READINGS] <= 150 &&
       distance <= 150 &&
       distance >= 0 && enableCount)
   {
-    distances[0] = 500;
-    distances[1] = 500;
-    distances[2] = 500;
     enableCount = false;
     carCount += 1;
   }
-  else if (distance > 150)
+  else if (distances[(distancesIndex-1)%NUM_PREV_READINGS] > 150 && 
+           distances[(distancesIndex-2)%NUM_PREV_READINGS] > 150 &&
+           distance > 150)
   {
     enableCount = true; 
   }
