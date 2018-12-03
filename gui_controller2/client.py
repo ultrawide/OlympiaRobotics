@@ -17,13 +17,14 @@ import smbus #for i2c			# must enabled for SMBUS
 import pigpio
 
 # CONSTANTS
-CONFIG_FILENAME = 'config.txt'  # configuration file name
+CONFIG_FILENAME = '/home/pi/OlympiaRobotics/gui_controller/config.txt'  # configuration file name
 VIDEO_WIDTH		= 640
 VIDEO_HEIGHT	= 480
 
 SMBUS_CONTROLLER = 1			# i2c bus controller
 ARDUINO_I2C_ADDRESS = 0x04		# address of the arduino on the i2c bus
-ARDUINO_I2C_RESPONSE_TIME = 0.1	# the amount of time to wait for a response from arduino after writing to the i2c
+ARDUINO_I2C_RESPONSE_TIME = 0.01	# the amount of time to wait for a response from arduino after writing to the i2c
+ARDUINO_INTERRUPT_WAIT_TIME = 0.01      # the amount of time to wait when the arduino has interrupts disabled
 
 STATUS_UPDATE_DELAY = 0.5		# time to wait until next status update is sent
 
@@ -224,7 +225,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET))
@@ -242,7 +243,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_STOP))
@@ -260,7 +261,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_EMERGENCY))
@@ -277,7 +278,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROBLEM))
@@ -294,7 +295,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_DISPLAY_PROCEED))
@@ -310,7 +311,7 @@ def process_command(socket, pwm_enabled, i2c_enabled, signboard_enabled, bus):
 					lock.acquire()
 					while (GPIO.input(35) == 1):
 						print("arduino has interrupts disbaled")
-						time.sleep(.01)
+						time.sleep(ARDUINO_INTERRUPT_WAIT_TIME)
 						continue
 					GPIO.output(37, GPIO.HIGH) #Tell arduino not to disable interrupts
 					writeNumber(bus, ARDUINO_I2C_ADDRESS, int(robotcommands.CMD_DEV_RESET_EMERGENCY))
@@ -373,6 +374,7 @@ def publish_robot_status(socket, i2c_enabled, bus):
 				time.sleep(ARDUINO_I2C_RESPONSE_TIME)
 				emergencyFlag = readNumber(bus,ARDUINO_I2C_ADDRESS)
 				prevEmergencyFlag = emergencyFlag
+				print("From Arduino, I received emergency flag: ", emergencyFlag)
 				GPIO.output(37, GPIO.LOW)
 				# TODO: also grab the emergency vehicle flag status from the arduino
 				# TODO: publish to the emergency vehicle flag status along with car count
@@ -416,9 +418,11 @@ if __name__ == "__main__":
 	controller_ip = ""
 	location_port = rc.get_option_str(rc.IP_LOCATION_PORT_CFG)
 	while ip_result == False:
-		baseip = robo_library.get_ip(rc.get_option_str(rc.NETWORK_ADAPTER_CFG))
-		baseip = str(baseip).split('.')
-		baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
+		#baseip = robo_library.get_ip(rc.get_option_str(rc.NETWORK_ADAPTER_CFG))
+		#baseip = str(baseip).split('.')
+		#baseip = baseip[0] + '.' + baseip[1] + '.'+ baseip[2] + '.'
+
+		baseip = '10.0.0.'
 		controller_ip  = baseip + str(ip_number)
 		print("Checking ip " + controller_ip)
 		ip_result = test_socket(controller_ip, location_port)
