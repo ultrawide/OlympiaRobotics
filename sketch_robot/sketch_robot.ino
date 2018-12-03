@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 // DEBUG
-#define DEBUG 1 // set DEBUG 0 to turn off print statements
+#define DEBUG 0 // set DEBUG 0 to turn off print statements
 // I2C 
 #define SLAVE_ADDRESS 0x04
 
@@ -240,13 +240,12 @@ void Car_Count()
       distance <= 150 &&
       distance >= 0 && enableCount)
   {
-    distances[0] = 500;
-    distances[1] = 500;
-    distances[2] = 500;
     enableCount = false;
     carCount += 1;
   }
-  else if (distance > 150)
+  else if (distances[(distancesIndex-1)%NUM_PREV_READINGS] > 150 && 
+           distances[(distancesIndex-2)%NUM_PREV_READINGS] > 150 && 
+           distance > 150)
   {
     enableCount = true; 
   }
