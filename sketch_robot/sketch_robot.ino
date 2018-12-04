@@ -51,8 +51,10 @@ int RECVPIN = 12;
 int LEDPIN = 3;
 
 // IR Sensor Variables
-int isEmergency = 0;
-
+int isEmergencyFlag = 0;
+#define NUM_READINGS_IR 8
+int irReadings[NUM_READINGS_IR] = {-1, -1, -1, -1, -1, -1, -1, -1};
+int irReadingsIndex = 0;
 
 //Disabling Interrupts 
 int A_TO_P = 50; // This connects to 35 Arduino to Pi (output)
@@ -100,8 +102,8 @@ void loop() {
   curTime = millis();
   
   if (curTime >= irTime){
-    //IR_Detector();
-    //irTime = millis() + 300;
+    IR_Detector();
+    irTime = millis() + 200;
   }
 
   curTime = millis();
@@ -186,11 +188,11 @@ void sendData(){
   }
   else if (RECEIVED_CMD == RESET_EMERGENCY_FLAG)
   {
-    isEmergency = 0;
+    isEmergencyFlag = 0;
   }
   else if (RECEIVED_CMD == WRITE_EMERGENCY_FLAG)
   {
-    Wire.write(isEmergency);
+    Wire.write(isEmergencyFlag);
   }
 }
 
@@ -259,14 +261,49 @@ void Car_Count()
   }
 }
 
+_Bool isEmergency(int* irReadings)
+{
+  int numZeroes = 0;
+  for (int i = 0; i < NUM_READINGS_IR; i++)
+  {
+    if (irReadings[i] == 0)
+      numZeroes++;
+  }
+
+  if (numZeroes >= 2)
+    return true;
+  else
+    return false;
+}
+
 void IR_Detector()
 {
-  if (digitalRead(12) == 0) {
-    isEmergency = 1;
+  irReadings[irReadingsIndex] = digitalRead(RECVPIN);
+  Serial.println("Current IR reading");
+  Serial.println(irReadings[irReadingsIndex]);
+  irReadingsIndex = (irReadingsIndex+1) % NUM_READINGS_IR;
+
+  Serial.println("Index");
+  Serial.println(irReadingsIndex);
+
+  if (DEBUG == 1) {
+    Serial.println("IR Readings:");
+    Serial.println(irReadings[0]);
+    Serial.println(irReadings[1]);
+    Serial.println(irReadings[2]);
+    Serial.println(irReadings[3]);
+    Serial.println(irReadings[4]);
+    Serial.println(irReadings[5]);
+    Serial.println(irReadings[6]);
+    Serial.println(irReadings[7]);
+  }
+
+  if (isEmergency(irReadings) == true) {
+    isEmergencyFlag = 1;
   }
 
   if (DEBUG == 1) {
-    if (isEmergency == 1) {
+    if (isEmergencyFlag == 1) {
       Serial.println("Approaching");
     }
     else {
@@ -274,59 +311,3 @@ void IR_Detector()
     }
   }  
 }
-/*
-#define NUM_READINGS 5
-#define ABOVE_THRESHHOLD 1
-#define BELOW_THRESHHOLD 0
-#define DISTANCE_THRESHHOLD 150
-int distanceFlag = BELOW_THRESHHOLD;
-
-// This function tries to reduce false noisy readings by
-// making NUM_READINGS additional readings to confirm it
-int confirmReading(int currentReading, int* distanceFlag)
-{
-	int distance = 0;
-	int duration = 0;
-
-	if (distanceFlag == ABOVE_THRESHOLD && currentReading > DISTANCE_THRESHHOLD)
-		return 0;
-
-	if (distanceFlag == BELOW_THRESHHOLD && currentReading < DISTANCE_THRESHHOLD)
-		return 0;
-
-	cli(); // disables interrupts
-
-	for (int i = 0; i < NUM_READINGS; i++)
-	{
-		digitalWrite(TRIGPIN, LOW);
-		delayMicroseconds(2);
-		
-		digitalWrite(TRIGPIN, HIGH);
-		delayMicroseconds(10);
-		digitalWrite(TRIGPIN, LOW);
-
-		// Reads the echoPin, returns the sound wave travel time in
-		// microseconds
-		duration = pulseIn(ECHOPIN, HIGH);
-
-		// Calculating the distance
-		distance = duration*0.034/2;
-		
-		if (distanceFlag == ABOVE_THRESHHOLD && distance > DISTANCE_THRESHHOLD)
-			return 0;
-		
-		if (distanceFlag == BELOW_THRESHHOLD && distance < DISTANCE_THRESHHOLD)
-			return 0;
-	}
-
-	sei(); // enables interrupts
-	
-	if (distanceFlag == ABOVE_THRESHHOLD)
-		*distanceFlag = BELOW_THRESHHOLD;
-	else
-		*distanceFlag = ABOVE_THRESHHOLD;
-
-	return 1;
-}
-
-*/
