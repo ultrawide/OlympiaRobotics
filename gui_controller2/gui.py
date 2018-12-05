@@ -105,7 +105,7 @@ class RobotStatusWorker(QThread):
 				emergency_flag = emergency_flag.decode('utf-8')
 				
 				#print("Recieved %s cars from Robot %s" % robot_publisher,str(car_count))
-				self.sig.emit(str(self.robot_name), str(car_count), str(emergency_flag))			
+				self.sig.emit(str(self.robot_name), str(car_count), str(emergency_flag))		
 				time.sleep(.25)
 		finally:
 			print(self.robot_name + 'Car Thread done')
@@ -325,15 +325,23 @@ class RobotControl(QWidget):
 			# message box pops up when operator tries to have both robots showing the slow signs
 		elif (ButtonLock["button"]):
 			self.msg = QMessageBox()
-			self.msg.setIcon(QMessageBox.Information)
-			self.msg.setText("Error:")
-			self.msg.setDetailedText("You cannot have both robots showing the slow sign!")
+			self.msg.setStandardButtons(QMessageBox.Close)
+			self.msg.setWindowTitle("Action Not Allowed")
+			self.msg.setIcon(QMessageBox.Critical)
+			self.msg.setText("Danger: Both flaggers would show the slow sign!")
+			self.msg.setDetailedText("You attempted to set both flaggers to show the slow sign."
+				+ " To change the direction of traffic flow, the robot showing the slow sign should set its sign to stop."
+				+ " Then wait for traffic to clear between the flaggers.  Finally, set the other flagger's sign to slow")
 			retval = self.msg.exec_()
 		else:
 			self.msg = QMessageBox()
-			self.msg.setIcon(QMessageBox.Information)
-			self.msg.setText("Error:")
-			self.msg.setDetailedText("There are still cars present within construction zone!")
+			self.msg.setStandardButtons(QMessageBox.Close)
+			self.msg.setWindowTitle("Action Not Allowed")
+			self.msg.setIcon(QMessageBox.Critical)
+			self.msg.setText("Danger: Cars travelling between flaggers.")
+			self.msg.setDetailedText("There are still cars present within construction zone!"
+				+ " To change the direction of traffic, wait for the cars between the flaggers to clear."
+				+ " Then set one of the flaggers to slow")
 			retval = self.msg.exec_()
 			
 	def switch_signboard(self,index):
@@ -559,8 +567,10 @@ class ProcesssingWindow(QMainWindow,QThread):
 			self.statusBar.showMessage("15 cars each turn is alowed to pass")
 			self.text.append("Changing number of cars allowed to pass to 15")
 			NumberOfCars["Number"] = 15
+
 	def ProcessMessages(self,message):
 		self.text.append(message)
+
 	def closeEvent(self, event):
 		print("Closing Automated processing window")
 
@@ -578,7 +588,7 @@ class AdvancedCarCount(QWidget):
 		painter = QPainter(self)
 		car_pixmap = QPixmap("car.jpg")
 
-		number_text = str(self.num_cars) + "  Cars Between the Flaggers"
+		number_text = str(self.num_cars) + " Cars Between the Flaggers"
 		painter.drawText(QRectF(0.0,0.0,250.0,30.0), Qt.AlignCenter|Qt.AlignTop, number_text)
 
 		i = 0
@@ -592,7 +602,7 @@ class MainWindow(QWidget):
 
 	def __init__(self, net_adapter):
 		QWidget.__init__(self)
-
+		self.setWindowTitle("RoboFlagger Control")
 		self.manual = True
 		# get my ip stuff here
 		server_address = robo_library.get_ip(NET_ADAPTER)
@@ -648,7 +658,7 @@ class MainWindow(QWidget):
 			self.auto.run()
 		else:
 			print("switch mode to manual")
-			self.Manual_Auto_button.setText("Set to Automated Mode")
+			self.Manual_Auto_button.setText("Set Control to Automatic Mode")
 			self.Manual_Auto_button.setStyleSheet('color: green')
 			self.manual = True
 			self.myProcesssingWindow.close()
