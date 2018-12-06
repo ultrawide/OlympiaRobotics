@@ -164,6 +164,7 @@ class IPLocationWorker(QThread):
 			connection, client_address = self.sock.accept()
 			try:
 				print ('connection from', client_address)
+				
 				count += count + 1
 			finally:
 				print("connection closed")
@@ -648,14 +649,27 @@ class MainWindow(QWidget):
 #function for switching between manual and automated mode
 	def switch_mode(self):
 		if self.manual:
-			print("switch mode to automated")
-			self.Manual_Auto_button.setText("Set to Manual Control")
-			self.Manual_Auto_button.setStyleSheet('color: black')
-			self.manual = False
+			
 
-			self.myProcesssingWindow.show()
-			self.auto = AutomatedMode(self.r1,self.r2,self.myProcesssingWindow)
-			self.auto.run()
+			if ((self.r1.sign_slow == False) and (self.r2.sign_slow == False) and (self.total_count == 0)):
+				print("switch mode to automated")
+				self.Manual_Auto_button.setText("Set to Manual Control")
+				self.Manual_Auto_button.setStyleSheet('color: black')
+				self.manual = False
+				self.myProcesssingWindow.show()
+				self.auto = AutomatedMode(self.r1,self.r2,self.myProcesssingWindow)
+				self.auto.run()
+			else:
+				self.msg = QMessageBox()
+				self.msg.setStandardButtons(QMessageBox.Close)
+				self.msg.setWindowTitle("Automated mode conditions not met!")
+				self.msg.setIcon(QMessageBox.Critical)
+				self.msg.setText("Warning: Please set Both robots to Stop before automated mode")
+				self.msg.setDetailedText("You attempted to start automated mode"
+					+ " Please ensure both robots are in STOP mode"
+					+ " Please ensure combined car count is 0")
+				retval = self.msg.exec_()
+			
 		else:
 			print("switch mode to manual")
 			self.Manual_Auto_button.setText("Set Control to Automatic Mode")
